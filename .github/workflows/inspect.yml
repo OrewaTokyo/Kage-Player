@@ -1,0 +1,45 @@
+name: Inspect project
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Collect the files needed for the next changes into INSPECT.txt
+        run: |
+          show() { for f in "$@"; do if [ -f "$f" ]; then echo; echo "--- $f"; head -n 220 "$f"; fi; done; }
+          sec() { echo; echo "=================== $1"; }
+          {
+            sec "build setup"
+            show settings.gradle.kts app/build.gradle.kts gradle/libs.versions.toml
+            sec "manifest and themes"
+            show app/src/main/AndroidManifest.xml
+            for f in $(find app/src/main/res -name 'themes.xml' -o -name 'styles.xml' | sort); do show "$f"; done
+            sec "icon and splash files"
+            find . -path ./.git -prune -o \( -name 'ic_launcher*' -o -name '*splash*' -o -name 'ic_logo*' \) -print | sort
+            for f in $(find app/src/main/res -path '*anydpi*' -name 'ic_launcher*.xml' | sort); do show "$f"; done
+            sec "app entry and navigation"
+            show app/src/main/java/dev/anilbeesetti/nextplayer/MainActivity.kt
+            for f in $(find app/src/main/java -path '*navigation*' -name '*.kt' | sort); do show "$f"; done
+            sec "every mention of network streaming outside the network module (file:line)"
+            grep -rnIE 'feature\.network|:feature:network|NetworkGraph|networkNavigation|NetworkRoute|NetworkScreen' --include=*.kt --include=*.kts --include=*.xml . 2>/dev/null | grep -v '^./feature/network/' | grep -v '/build/' | head -n 120 || true
+            sec "player: buttons, ui and state files with line counts"
+            find feature/player/src/main -name '*.kt' | sort | xargs wc -l 2>/dev/null
+            sec "player and decoder settings model"
+            show core/model/src/main/java/dev/anilbeesetti/nextplayer/core/model/PlayerPreferences.kt core/model/src/main/java/dev/anilbeesetti/nextplayer/core/model/DecoderPriority.kt
+            sec "decoder, ffmpeg and subtitle mentions (file:line)"
+            grep -rnIiE 'nextlib|ffmpeg|DecoderPriority|PREFER_|libass' --include=*.kt --include=*.kts --include=*.toml . 2>/dev/null | grep -v '/build/' | head -n 80 || true
+            sec "player settings screen and gestures"
+            find feature/settings/src/main -path '*screens*' -name '*.kt' | sort
+          } > INSPECT.txt 2>&1
+          wc -l INSPECT.txt
+      - name: Commit
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add INSPECT.txt
+          git commit -m "Add INSPECT.txt" || echo "Nothing to commit"
+          git push
