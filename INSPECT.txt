@@ -1,0 +1,1676 @@
+
+=================== build setup
+
+--- settings.gradle.kts
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+        maven { url = uri("https://jitpack.io") }
+    }
+}
+
+// Opt in with -PnextlibPath=../nextlib to test unpublished decoder changes.
+providers.gradleProperty("nextlibPath").orNull?.let { nextlibPath ->
+    includeBuild(nextlibPath) {
+        dependencySubstitution {
+            substitute(
+                module("io.github.anilbeesetti:nextlib-media3ext"),
+            ).using(project(":media3ext"))
+            substitute(
+                module("io.github.anilbeesetti:nextlib-mediainfo"),
+            ).using(project(":mediainfo"))
+        }
+    }
+}
+
+rootProject.name = "NextPlayer"
+include(":app")
+include(":core:common")
+include(":core:data")
+include(":core:database")
+include(":core:datastore")
+include(":core:domain")
+include(":core:media")
+include(":core:model")
+include(":core:ui")
+include(":feature:network")
+include(":feature:playlist")
+include(":feature:player")
+include(":feature:settings")
+include(":feature:videopicker")
+include(":ktlint-rules")
+project(":ktlint-rules").projectDir = file("tools/ktlint-rules")
+
+--- app/build.gradle.kts
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
+plugins {
+    alias(libs.plugins.androidApplication)
+    alias(libs.plugins.composeCompiler)
+    alias(libs.plugins.kotlinSerialization)
+    alias(libs.plugins.koin.compiler)
+}
+
+android {
+    namespace = "dev.anilbeesetti.nextplayer"
+
+    compileSdk = libs.versions.android.compileSdk.get().toInt()
+    defaultConfig {
+        minSdk = libs.versions.android.minSdk.get().toInt()
+        targetSdk = libs.versions.android.targetSdk.get().toInt()
+        applicationId = "app.kage.player"
+        versionCode = 78
+        versionName = "0.21.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunnerArguments["clearPackageData"] = "true"
+    }
+
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
+
+    testOptions {
+        execution = "ANDROIDX_TEST_ORCHESTRATOR"
+        unitTests.isIncludeAndroidResources = true
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.toVersion(libs.versions.android.jvm.get().toInt())
+        targetCompatibility = JavaVersion.toVersion(libs.versions.android.jvm.get().toInt())
+    }
+
+    buildTypes {
+        getByName("release") {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
+        }
+
+        getByName("debug") {
+            isDebuggable = true
+            applicationIdSuffix = ".debug"
+        }
+
+        create("release-with-debug-signing") {
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
+            applicationIdSuffix = ".release"
+            matchingFallbacks.add("release")
+        }
+    }
+
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("${project.rootDir}/app/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
+    splits {
+        abi {
+            //noinspection WrongGradleMethod
+            val isBuildingBundle = gradle.startParameter.taskNames.any {
+                it.lowercase().contains("bundle")
+            }
+
+            isEnable = !isBuildingBundle
+            reset()
+            include(
+                "armeabi-v7a",
+                "arm64-v8a",
+                "x86",
+                "x86_64",
+            )
+            isUniversalApk = true
+        }
+    }
+
+    packaging {
+        resources {
+            excludes.add("/META-INF/{AL2.0,LGPL2.1}")
+            // Picnic signature data from Bouncy Castle; SSH never negotiates Picnic.
+            excludes.add("/org/bouncycastle/pqc/legacy/picnic/**")
+        }
+    }
+
+    dependenciesInfo {
+        // Disables dependency metadata when building APKs.
+        includeInApk = false
+        // Disables dependency metadata when building Android App Bundles.
+        includeInBundle = false
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.fromTarget(libs.versions.android.jvm.get()))
+    }
+}
+
+dependencies {
+
+    implementation(project(":core:common"))
+    implementation(project(":core:data"))
+    implementation(project(":core:media"))
+    implementation(project(":core:model"))
+    implementation(project(":core:ui"))
+    implementation(project(":feature:network"))
+    implementation(project(":feature:playlist"))
+    implementation(project(":feature:videopicker"))
+    implementation(project(":feature:player"))
+    implementation(project(":feature:settings"))
+
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.appcompat)
+
+    // Compose
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.ui.tooling.preview)
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.material3.adaptive)
+    implementation(libs.androidx.navigation3.runtime)
+    implementation(libs.androidx.navigation3.ui)
+    implementation(libs.androidx.lifecycle.viewmodel.navigation3)
+    implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.runtimeCompose)
+
+    implementation(libs.google.android.material)
+    implementation(libs.androidx.core.splashscreen)
+
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
+
+    // Koin
+    implementation(libs.koin.android)
+    implementation(libs.koin.annotations)
+    implementation(libs.koin.compose.viewmodel)
+
+    implementation(libs.accompanist.permissions)
+
+    implementation(libs.github.anilbeesetti.nextlib.mediainfo)
+
+    testImplementation(libs.junit4)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.robolectric)
+    androidTestImplementation(project(":core:domain"))
+    androidTestImplementation(libs.androidx.datastore.core)
+    androidTestImplementation(libs.androidx.media3.session)
+    androidTestImplementation(libs.androidx.media3.ui)
+    androidTestImplementation(libs.github.anilbeesetti.nextlib.media3ext)
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(libs.androidx.test.ext)
+    androidTestImplementation(libs.androidx.test.rules)
+    androidTestImplementation(libs.androidx.test.espresso.core)
+    androidTestImplementation(libs.okhttp.mockwebserver)
+    androidTestUtil(libs.androidx.test.orchestrator)
+    androidTestImplementation(libs.androidx.compose.ui.test)
+    debugImplementation(libs.androidx.compose.ui.tooling)
+    debugImplementation(libs.androidx.compose.ui.testManifest)
+}
+
+--- gradle/libs.versions.toml
+[versions]
+android-compileSdk = "37"
+android-targetSdk = "37"
+android-minSdk = "24"
+android-jvm = "17"
+aboutlibraries = "15.3.0"
+accompanist = "0.37.3"
+androidGradlePlugin = "9.5.1"
+androidMaterial = "1.14.0"
+androidxActivity = "1.13.0"
+androidxAppCompat = "1.8.0"
+androidxBiometric = "1.1.0"
+androidxComposeBom = "2026.09.00"
+androidxMaterial3 = "1.5.0-alpha15"
+androidxMaterial3Adaptive = "1.3.0"
+androidxCore = "1.19.1"
+androidxCorePip = "1.0.0-alpha04"
+androidxCoreSplashscreen = "1.2.0"
+androidxDataStore = "1.3.0"
+androidxEspresso = "3.7.0"
+androidxLifecycle = "2.11.0"
+androidxMedia3 = "1.11.1"
+androidxNavigation3 = "1.2.1"
+androidxLifecycleViewmodelNav3 = "2.11.0"
+androidxTestExt = "1.3.0"
+androidxTestRules = "1.7.0"
+androidxTestOrchestrator = "1.6.1"
+coil = "3.6.3"
+junit4 = "4.13.2"
+koin = "4.2.2"
+koinCompiler = "1.2.3"
+kotlin = "2.4.21"
+kotlinxCoroutines = "1.11.0"
+kotlinxSerializationJson = "1.12.0"
+ksp = "2.3.13"
+ktlint = "14.2.0"
+ktlintCli = "1.8.0"
+reorderable = "3.1.0"
+room = "2.8.5"
+sshj = "0.41.2"
+bouncyCastle = "1.80.2"
+robolectric = "4.16.1"
+nextlib = "1.11.1-0.18.0"
+universalChardet = "2.5.2"
+smbj = "0.14.0"
+smbjRpc = "0.12.13"
+mockito = "5.24.0"
+# MockWebServer must match the app's OkHttp runtime (Coil and Sardine use 4.x).
+okhttp = "4.12.0"
+commonsNet = "3.13.0"
+sardineAndroid = "0.9"
+
+
+[libraries]
+ktlint-ruleset-core = { module = "com.pinterest.ktlint:ktlint-cli-ruleset-core", version.ref = "ktlintCli" }
+ktlint-rule-engine = { module = "com.pinterest.ktlint:ktlint-rule-engine", version.ref = "ktlintCli" }
+ktlint-ruleset-standard = { module = "com.pinterest.ktlint:ktlint-ruleset-standard", version.ref = "ktlintCli" }
+koin-core = { module = "io.insert-koin:koin-core", version.ref = "koin" }
+koin-android = { module = "io.insert-koin:koin-android", version.ref = "koin" }
+koin-compose-viewmodel = { module = "io.insert-koin:koin-compose-viewmodel", version.ref = "koin" }
+koin-annotations = { module = "io.insert-koin:koin-annotations", version.ref = "koin" }
+aboutlibraries-core = { group = "com.mikepenz", name = "aboutlibraries-core", version.ref = "aboutlibraries" }
+accompanist-permissions = { group = "com.google.accompanist", name = "accompanist-permissions", version.ref = "accompanist" }
+androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "androidxActivity" }
+androidx-activity-ktx = { group = "androidx.activity", name = "activity-ktx", version.ref = "androidxActivity" }
+androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "androidxAppCompat" }
+androidx-biometric = { group = "androidx.biometric", name = "biometric", version.ref = "androidxBiometric" }
+androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "androidxComposeBom" }
+androidx-compose-icons = { module = "androidx.compose.material:material-icons-extended" }
+androidx-compose-material-iconsExtended = { group = "androidx.compose.material", name = "material-icons-extended" }
+androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "androidxMaterial3" }
+androidx-compose-material3-adaptive = { group = "androidx.compose.material3.adaptive", name = "adaptive", version.ref = "androidxMaterial3Adaptive" }
+androidx-compose-ui = { group = "androidx.compose.ui", name = "ui" }
+androidx-compose-ui-test = { group = "androidx.compose.ui", name = "ui-test-junit4" }
+androidx-compose-ui-testManifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
+androidx-compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
+androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
+androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "androidxCore" }
+androidx-core-pip = { group = "androidx.core", name = "core-pip", version.ref = "androidxCorePip" }
+androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "androidxCoreSplashscreen" }
+androidx-datastore-core = { group = "androidx.datastore", name = "datastore", version.ref = "androidxDataStore" }
+androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "androidxLifecycle" }
+androidx-lifecycle-runtimeCompose = { group = "androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "androidxLifecycle" }
+androidx-lifecycle-viewModel-ktx = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-ktx", version.ref = "androidxLifecycle" }
+androidx-media3-common = { group = "androidx.media3", name = "media3-common", version.ref = "androidxMedia3" }
+androidx-media3-datasource = { group = "androidx.media3", name = "media3-datasource", version.ref = "androidxMedia3" }
+androidx-media3-exoplayer = { group = "androidx.media3", name = "media3-exoplayer", version.ref = "androidxMedia3" }
+androidx-media3-exoplayer-dash = { group = "androidx.media3", name = "media3-exoplayer-dash", version.ref = "androidxMedia3" }
+androidx-media3-exoplayer-hls = { group = "androidx.media3", name = "media3-exoplayer-hls", version.ref = "androidxMedia3" }
+androidx-media3-exoplayer-rtsp = { group = "androidx.media3", name = "media3-exoplayer-rtsp", version.ref = "androidxMedia3" }
+androidx-media3-session = { group = "androidx.media3", name = "media3-session", version.ref = "androidxMedia3" }
+androidx-media3-ui = { group = "androidx.media3", name = "media3-ui", version.ref = "androidxMedia3" }
+androidx-media3-ui-compose = { group = "androidx.media3", name = "media3-ui-compose", version.ref = "androidxMedia3" }
+androidx-navigation3-runtime = { group = "androidx.navigation3", name = "navigation3-runtime", version.ref = "androidxNavigation3" }
+androidx-navigation3-ui = { group = "androidx.navigation3", name = "navigation3-ui", version.ref = "androidxNavigation3" }
+androidx-lifecycle-viewmodel-navigation3 = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-navigation3", version.ref = "androidxLifecycleViewmodelNav3" }
+androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
+androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
+androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
+androidx-room-testing = { group = "androidx.room", name = "room-testing", version.ref = "room" }
+androidx-test-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "androidxEspresso" }
+androidx-test-ext = { group = "androidx.test.ext", name = "junit-ktx", version.ref = "androidxTestExt" }
+androidx-test-rules = { group = "androidx.test", name = "rules", version.ref = "androidxTestRules" }
+androidx-test-orchestrator = { group = "androidx.test", name = "orchestrator", version.ref = "androidxTestOrchestrator" }
+coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
+coil-network-okhttp = { module = "io.coil-kt.coil3:coil-network-okhttp", version.ref = "coil" }
+github-albfernandez-juniversalchardet = { group="com.github.albfernandez", name = "juniversalchardet", version.ref="universalChardet" }
+github-anilbeesetti-nextlib-media3ext = { group = "io.github.anilbeesetti", name = "nextlib-media3ext", version.ref = "nextlib" }
+github-anilbeesetti-nextlib-mediainfo = { group = "io.github.anilbeesetti", name = "nextlib-mediainfo", version.ref = "nextlib" }
+google-android-material = { group = "com.google.android.material", name = "material", version.ref = "androidMaterial" }
+junit4 = { group = "junit", name = "junit", version.ref = "junit4" }
+kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "kotlinxCoroutines" }
+kotlinx-coroutines-guava = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-guava", version.ref = "kotlinxCoroutines" }
+kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "kotlinxCoroutines" }
+kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
+reorderable = { module = "sh.calvin.reorderable:reorderable", version.ref = "reorderable" }
+robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
+smbj = { group = "com.hierynomus", name = "smbj", version.ref = "smbj" }
+smbj-rpc = { group = "com.rapid7.client", name = "dcerpc", version.ref = "smbjRpc" }
+mockito-core = { group = "org.mockito", name = "mockito-core", version.ref = "mockito" }
+okhttp-mockwebserver = { module = "com.squareup.okhttp3:mockwebserver", version.ref = "okhttp" }
+sshj = { group = "com.hierynomus", name = "sshj", version.ref = "sshj" }
+bouncycastle-provider = { group = "org.bouncycastle", name = "bcprov-jdk18on", version.ref = "bouncyCastle" }
+commons-net = { group = "commons-net", name = "commons-net", version.ref = "commonsNet" }
+sardine-android = { group = "com.github.thegrizzlylabs", name = "sardine-android", version.ref = "sardineAndroid" }
+
+[plugins]
+koin-compiler = { id = "io.insert-koin.compiler.plugin", version.ref = "koinCompiler" }
+aboutLibraries = { id = "com.mikepenz.aboutlibraries.plugin.android", version.ref = "aboutlibraries" }
+androidApplication = { id = "com.android.application", version.ref = "androidGradlePlugin" }
+androidLibrary = { id = "com.android.library", version.ref = "androidGradlePlugin" }
+composeCompiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+kotlinJvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlinSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlint" }
+
+=================== manifest and themes
+
+--- app/src/main/AndroidManifest.xml
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission
+        android:name="com.android.launcher.permission.INSTALL_SHORTCUT"
+        android:maxSdkVersion="25" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+
+    <uses-feature
+        android:name="android.software.leanback"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.touchscreen"
+        android:required="false" />
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32"
+        tools:ignore="ScopedStorage" />
+
+    <application
+        android:name=".NextPlayerApplication"
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:requestLegacyExternalStorage="true"
+        android:label="@string/app_name"
+        android:banner="@drawable/tv_banner"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.NextPlayer.Splash"
+        tools:targetApi="s">
+        <activity
+            android:name=".MainActivity"
+            android:banner="@drawable/tv_banner"
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity android:name=".crash.CrashActivity" />
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_provider_paths" />
+        </provider>
+    </application>
+</manifest>
+
+--- app/src/main/res/values/themes.xml
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="Theme.NextPlayer.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash</item>
+        <item name="windowSplashScreenBackground">#171B1C</item>
+        <item name="postSplashScreenTheme">@style/Theme.NextPlayer</item>
+    </style>
+
+    <style name="Theme.NextPlayer" parent="Theme.Material3.DynamicColors.DayNight.NoActionBar" />
+</resources>
+=================== icon and splash files
+./app/src/main/ic_launcher-playstore.png
+./app/src/main/res/drawable/ic_launcher_foreground.xml
+./app/src/main/res/drawable/ic_splash.xml
+./app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+./app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
+./app/src/main/res/mipmap-hdpi/ic_launcher.webp
+./app/src/main/res/mipmap-hdpi/ic_launcher_round.webp
+./app/src/main/res/mipmap-mdpi/ic_launcher.webp
+./app/src/main/res/mipmap-mdpi/ic_launcher_round.webp
+./app/src/main/res/mipmap-xhdpi/ic_launcher.webp
+./app/src/main/res/mipmap-xhdpi/ic_launcher_round.webp
+./app/src/main/res/mipmap-xxhdpi/ic_launcher.webp
+./app/src/main/res/mipmap-xxhdpi/ic_launcher_round.webp
+./app/src/main/res/mipmap-xxxhdpi/ic_launcher.webp
+./app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.webp
+./app/src/main/res/values/ic_launcher_background.xml
+./core/ui/src/main/ic_launcher-playstore.png
+
+--- app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background_tint"/>
+    <foreground android:drawable="@drawable/ic_launcher_foreground"/>
+    <monochrome android:drawable="@drawable/ic_launcher_foreground" />
+</adaptive-icon>
+--- app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background_tint" />
+    <foreground android:drawable="@drawable/ic_launcher_foreground" />
+    <monochrome android:drawable="@drawable/ic_launcher_foreground" />
+</adaptive-icon>
+=================== app entry and navigation
+
+--- app/src/main/java/dev/anilbeesetti/nextplayer/MainActivity.kt
+package dev.anilbeesetti.nextplayer
+
+import android.content.Intent
+import android.content.res.Configuration
+import android.graphics.Color
+import android.os.Bundle
+import androidx.activity.SystemBarStyle
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateMap
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.dp
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.core.view.WindowCompat
+import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation3.runtime.NavEntryDecorator
+import androidx.navigation3.runtime.NavKey
+import androidx.navigation3.runtime.entryProvider
+import androidx.navigation3.ui.NavDisplay
+import androidx.window.core.layout.WindowSizeClass
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import dev.anilbeesetti.nextplayer.core.common.extensions.isTelevision
+import dev.anilbeesetti.nextplayer.core.common.service.system.SystemService
+import dev.anilbeesetti.nextplayer.core.media.services.MediaOperationsService
+import dev.anilbeesetti.nextplayer.core.model.ThemeConfig
+import dev.anilbeesetti.nextplayer.core.ui.components.LocalNavigationBottomPadding
+import dev.anilbeesetti.nextplayer.core.ui.components.LocalTopLevelBottomBarVisibleSetter
+import dev.anilbeesetti.nextplayer.core.ui.components.LocalTopLevelFabSetter
+import dev.anilbeesetti.nextplayer.core.ui.components.TopLevelFabState
+import dev.anilbeesetti.nextplayer.core.ui.components.thenIf
+import dev.anilbeesetti.nextplayer.core.ui.theme.NextPlayerTheme
+import dev.anilbeesetti.nextplayer.navigation.NextNavigationBar
+import dev.anilbeesetti.nextplayer.navigation.NextNavigationRail
+import dev.anilbeesetti.nextplayer.navigation.TopLevelDestination
+import dev.anilbeesetti.nextplayer.navigation.TopLevelNavState
+import dev.anilbeesetti.nextplayer.navigation.mediaNavGraph
+import dev.anilbeesetti.nextplayer.navigation.moreNavGraph
+import dev.anilbeesetti.nextplayer.navigation.navigationTransition
+import dev.anilbeesetti.nextplayer.navigation.navigationTransitionModifier
+import dev.anilbeesetti.nextplayer.navigation.networkNavGraph
+import dev.anilbeesetti.nextplayer.navigation.openPlaylist
+import dev.anilbeesetti.nextplayer.navigation.playlistNavGraph
+import dev.anilbeesetti.nextplayer.navigation.rememberTopLevelNavState
+import dev.anilbeesetti.nextplayer.navigation.settingsNavGraph
+import org.koin.android.ext.android.inject
+import org.koin.androidx.viewmodel.ext.android.viewModel
+
+class MainActivity : FragmentActivity() {
+
+    private val mediaOperationsService: MediaOperationsService by inject()
+
+    private val systemService: SystemService by inject()
+
+    private val viewModel: MainViewModel by viewModel()
+
+    private var pendingPlaylistId by mutableStateOf<Long?>(value = null)
+    private var darkSystemBars = false
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        pendingPlaylistId = PlaylistShortcut.playlistId(intent = intent)
+    }
+
+    @OptIn(ExperimentalPermissionsApi::class)
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        if (savedInstanceState == null) {
+            pendingPlaylistId = PlaylistShortcut.playlistId(intent = intent)
+        }
+        systemService.initialize(activity = this@MainActivity)
+        mediaOperationsService.initialize(activity = this@MainActivity)
+
+        installSplashScreen().setKeepOnScreenCondition {
+            viewModel.state.value is MainActivityUiState.Loading
+        }
+
+        darkSystemBars = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK ==
+            Configuration.UI_MODE_NIGHT_YES
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.auto(
+                lightScrim = Color.TRANSPARENT,
+                darkScrim = Color.TRANSPARENT,
+                detectDarkMode = { darkSystemBars },
+            ),
+            navigationBarStyle = SystemBarStyle.auto(
+                lightScrim = Color.TRANSPARENT,
+                darkScrim = Color.TRANSPARENT,
+                detectDarkMode = { darkSystemBars },
+            ),
+        )
+
+        setContent {
+            val state by viewModel.state.collectAsStateWithLifecycle()
+            val shouldUseDarkTheme = shouldUseDarkTheme(state = state)
+
+            LaunchedEffect(key1 = shouldUseDarkTheme) {
+                darkSystemBars = shouldUseDarkTheme
+                WindowCompat.getInsetsController(
+                    window,
+                    window.decorView,
+                ).apply {
+                    isAppearanceLightStatusBars = !shouldUseDarkTheme
+                    isAppearanceLightNavigationBars = !shouldUseDarkTheme
+                }
+            }
+
+            NextPlayerTheme(
+                darkTheme = shouldUseDarkTheme,
+                highContrastDarkTheme = shouldUseHighContrastDarkTheme(state = state),
+                dynamicColor = shouldUseDynamicTheming(state = state),
+            ) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.surfaceContainer,
+                ) {
+                    val navState = rememberTopLevelNavState()
+
+                    LaunchedEffect(key1 = pendingPlaylistId) {
+                        pendingPlaylistId?.let { playlistId ->
+                            navState.openPlaylist(playlistId = playlistId)
+                            pendingPlaylistId = null
+                        }
+                    }
+
+                    val mediaStack = navState.backStacks.getValue(TopLevelDestination.MEDIA.route)
+                    val playlistStack = navState.backStacks.getValue(
+                        TopLevelDestination.PLAYLISTS.route,
+                    )
+                    val networkStack = navState.backStacks.getValue(
+                        TopLevelDestination.NETWORK.route,
+                    )
+                    val moreStack = navState.backStacks.getValue(TopLevelDestination.MORE.route)
+
+                    val provider = entryProvider {
+                        mediaNavGraph(
+                            context = this@MainActivity,
+                            backStack = mediaStack,
+                        )
+                        playlistNavGraph(
+                            context = this@MainActivity,
+                            backStack = playlistStack,
+                        )
+                        networkNavGraph(
+                            context = this@MainActivity,
+                            backStack = networkStack,
+                        )
+                        moreNavGraph(
+                            context = this@MainActivity,
+                            backStack = moreStack,
+                        )
+                        settingsNavGraph(backStack = navState.currentStack)
+                    }
+
+                    val topLevelFabStates =
+                        remember { mutableStateMapOf<String, TopLevelFabState>() }
+                    var showTopLevelBottomBar by remember { mutableStateOf(value = true) }
+                    NavigationLayout(
+                        state = navState,
+                        fabStates = topLevelFabStates,
+                        showBottomBar = showTopLevelBottomBar,
+                    ) { layoutPaddingValues ->
+                        val railPadding = layoutPaddingValues.calculateStartPadding(
+                            LocalLayoutDirection.current,
+                        )
+                        val navigationInsetsDecorator = remember(
+                            navState,
+                            railPadding,
+                        ) {
+                            NavEntryDecorator<NavKey> { entry ->
+                                // Reserve rail space per entry without resizing the animated display.
+                                Box(
+                                    navState.navigationTransitionModifier(entry).thenIf(
+                                        navState.topLevelContentKeys.contains(entry.contentKey),
+                                    ) {
+                                        padding(start = railPadding)
+                                            .consumeWindowInsets(
+                                                WindowInsets.displayCutout.only(
+
+--- app/src/main/java/dev/anilbeesetti/nextplayer/feature/more/navigation/MoreNavigation.kt
+package dev.anilbeesetti.nextplayer.feature.more.navigation
+
+import androidx.compose.runtime.SideEffect
+import androidx.navigation3.runtime.EntryProviderScope
+import androidx.navigation3.runtime.NavBackStack
+import androidx.navigation3.runtime.NavKey
+import dev.anilbeesetti.nextplayer.feature.more.screens.history.HistoryScreen
+import dev.anilbeesetti.nextplayer.feature.more.screens.history.HistoryViewModel
+import dev.anilbeesetti.nextplayer.feature.more.screens.more.MoreScreen
+import dev.anilbeesetti.nextplayer.feature.more.screens.more.MoreViewModel
+import dev.anilbeesetti.nextplayer.feature.more.screens.trash.TrashScreen
+import dev.anilbeesetti.nextplayer.feature.more.screens.trash.TrashViewModel
+import kotlinx.serialization.Serializable
+import org.koin.compose.viewmodel.koinViewModel
+import org.koin.core.parameter.parametersOf
+
+@Serializable
+object MoreRoute : NavKey
+
+@Serializable
+object HistoryRoute : NavKey
+
+@Serializable
+object TrashRoute : NavKey
+
+fun EntryProviderScope<NavKey>.moreEntry(
+    onHistoryClick: () -> Unit,
+    onPlayVideo: (String) -> Unit,
+    onSettingsClick: () -> Unit,
+    onTrashClick: () -> Unit,
+    onVaultClick: () -> Unit,
+) {
+    entry<MoreRoute> {
+        val output = MoreViewModel.Output(
+            openHistory = onHistoryClick,
+            playVideo = onPlayVideo,
+            openSettings = onSettingsClick,
+            openTrash = onTrashClick,
+            openVault = onVaultClick,
+        )
+        val viewModel = koinViewModel<MoreViewModel>(
+            parameters = { parametersOf(output) },
+        )
+        SideEffect { viewModel.output = output }
+        MoreScreen(viewModel = viewModel)
+    }
+}
+
+fun EntryProviderScope<NavKey>.historyEntry(
+    onNavigateUp: () -> Unit,
+    onPlayVideo: (String) -> Unit,
+) {
+    entry<HistoryRoute> {
+        val output = HistoryViewModel.Output(
+            navigateUp = onNavigateUp,
+            playVideo = onPlayVideo,
+        )
+        val viewModel = koinViewModel<HistoryViewModel>(
+            parameters = { parametersOf(output) },
+        )
+        SideEffect { viewModel.output = output }
+        HistoryScreen(viewModel = viewModel)
+    }
+}
+
+fun EntryProviderScope<NavKey>.trashEntry(
+    onNavigateUp: () -> Unit,
+    onPlayVideo: (String) -> Unit,
+) {
+    entry<TrashRoute> {
+        val output = TrashViewModel.Output(
+            navigateUp = onNavigateUp,
+            playVideo = onPlayVideo,
+        )
+        val viewModel = koinViewModel<TrashViewModel>(
+            parameters = { parametersOf(output) },
+        )
+        SideEffect { viewModel.output = output }
+        TrashScreen(viewModel = viewModel)
+    }
+}
+
+fun NavBackStack<NavKey>.navigateToMore() {
+    add(element = MoreRoute)
+}
+
+fun NavBackStack<NavKey>.navigateToHistory() {
+    add(element = HistoryRoute)
+}
+
+fun NavBackStack<NavKey>.navigateToTrash() {
+    add(element = TrashRoute)
+}
+
+--- app/src/main/java/dev/anilbeesetti/nextplayer/navigation/MediaNavGraph.kt
+package dev.anilbeesetti.nextplayer.navigation
+
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import androidx.navigation3.runtime.EntryProviderScope
+import androidx.navigation3.runtime.NavBackStack
+import androidx.navigation3.runtime.NavKey
+import dev.anilbeesetti.nextplayer.feature.player.PlayerActivity
+import dev.anilbeesetti.nextplayer.feature.player.utils.PlayerApi
+import dev.anilbeesetti.nextplayer.feature.videopicker.navigation.mediaPickerEntry
+import dev.anilbeesetti.nextplayer.feature.videopicker.navigation.navigateToMediaPickerScreen
+import dev.anilbeesetti.nextplayer.feature.videopicker.navigation.navigateToSearch
+import dev.anilbeesetti.nextplayer.feature.videopicker.navigation.navigateToVault
+import dev.anilbeesetti.nextplayer.feature.videopicker.navigation.searchEntry
+import dev.anilbeesetti.nextplayer.settings.navigation.navigateToSettings
+
+fun EntryProviderScope<NavKey>.mediaNavGraph(context: Context, backStack: NavBackStack<NavKey>) {
+    mediaPickerEntry(
+        onNavigateUp = { backStack.removeLastIfNotRoot() },
+        onPlayVideo = { uri -> context.startPlayback(uri = uri) },
+        onPlayVideos = { uris -> context.startPlayback(uris = uris) },
+        onFolderClick = backStack::navigateToMediaPickerScreen,
+        onSettingsClick = backStack::navigateToSettings,
+        onSearchClick = backStack::navigateToSearch,
+        onVaultClick = backStack::navigateToVault,
+    )
+
+    searchEntry(
+        onNavigateUp = { backStack.removeLastIfNotRoot() },
+        onPlayVideo = { uri -> context.startPlayback(uri = uri) },
+        onFolderClick = backStack::navigateToMediaPickerScreen,
+    )
+}
+
+internal fun Context.startPlayback(uri: Uri, grantReadPermission: Boolean = false) {
+    startPlayback(
+        uri = uri,
+        playlist = null,
+        grantReadPermission = grantReadPermission,
+    )
+}
+
+internal fun Context.startPlayback(
+    uris: List<Uri>,
+    startUri: Uri? = null,
+    grantReadPermission: Boolean = false,
+) {
+    val uri = startUri?.takeIf(predicate = uris::contains) ?: uris.firstOrNull() ?: return
+    startPlayback(
+        uri = uri,
+        playlist = uris,
+        grantReadPermission = grantReadPermission,
+    )
+}
+
+private fun Context.startPlayback(uri: Uri, playlist: List<Uri>?, grantReadPermission: Boolean) {
+    if (grantReadPermission) {
+        (playlist ?: listOf(element = uri)).forEach {
+            grantUriPermission(
+                packageName,
+                it,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION,
+            )
+        }
+    }
+    val intent = Intent(
+        this,
+        PlayerActivity::class.java,
+    ).apply {
+        action = Intent.ACTION_VIEW
+        data = uri
+        playlist?.let {
+            putExtra(
+                "video_list_is_explicit",
+                true,
+            )
+            putParcelableArrayListExtra(
+                PlayerApi.API_PLAYLIST,
+                ArrayList(it),
+            )
+        }
+        if (grantReadPermission) addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    startActivity(intent)
+}
+
+--- app/src/main/java/dev/anilbeesetti/nextplayer/navigation/MoreNavGraph.kt
+package dev.anilbeesetti.nextplayer.navigation
+
+import android.content.Context
+import androidx.core.net.toUri
+import androidx.navigation3.runtime.EntryProviderScope
+import androidx.navigation3.runtime.NavBackStack
+import androidx.navigation3.runtime.NavKey
+import dev.anilbeesetti.nextplayer.feature.more.navigation.historyEntry
+import dev.anilbeesetti.nextplayer.feature.more.navigation.moreEntry
+import dev.anilbeesetti.nextplayer.feature.more.navigation.navigateToHistory
+import dev.anilbeesetti.nextplayer.feature.more.navigation.navigateToTrash
+import dev.anilbeesetti.nextplayer.feature.more.navigation.trashEntry
+import dev.anilbeesetti.nextplayer.feature.videopicker.navigation.navigateToVault
+import dev.anilbeesetti.nextplayer.feature.videopicker.navigation.vaultEntry
+import dev.anilbeesetti.nextplayer.settings.navigation.navigateToSettings
+
+fun EntryProviderScope<NavKey>.moreNavGraph(context: Context, backStack: NavBackStack<NavKey>) {
+    moreEntry(
+        onHistoryClick = backStack::navigateToHistory,
+        onPlayVideo = { context.startPlayback(it.toUri()) },
+        onSettingsClick = backStack::navigateToSettings,
+        onTrashClick = backStack::navigateToTrash,
+        onVaultClick = backStack::navigateToVault,
+    )
+
+    historyEntry(
+        onNavigateUp = { backStack.removeLastIfNotRoot() },
+        onPlayVideo = { context.startPlayback(it.toUri()) },
+    )
+
+    trashEntry(
+        onNavigateUp = { backStack.removeLastIfNotRoot() },
+        onPlayVideo = { context.startPlayback(it.toUri()) },
+    )
+
+    vaultEntry(
+        onNavigateUp = { backStack.removeLastIfNotRoot() },
+        // Vault files are served through FileProvider, so read access must be granted at
+        // playback time for both PlayerActivity and the (separate) PlayerService component.
+        onPlayVideo = { uri ->
+            context.startPlayback(
+                uri = uri,
+                grantReadPermission = true,
+            )
+        },
+        onPlayVideos = { uris ->
+            context.startPlayback(
+                uris = uris,
+                grantReadPermission = true,
+            )
+        },
+    )
+}
+
+--- app/src/main/java/dev/anilbeesetti/nextplayer/navigation/NavBackStack.kt
+package dev.anilbeesetti.nextplayer.navigation
+
+import androidx.navigation3.runtime.NavBackStack
+import androidx.navigation3.runtime.NavKey
+
+/** Repairs an empty restored stack before it is passed to NavDisplay. */
+internal fun <T : NavKey> NavBackStack<T>.ensureRoot(root: T) {
+    if (isEmpty()) add(element = root)
+}
+
+/** Pops a nested destination while preserving the stack's required root entry. */
+internal fun <T : NavKey> NavBackStack<T>.removeLastIfNotRoot(): T? =
+    if (size > 1) removeAt(index = lastIndex) else null
+
+--- app/src/main/java/dev/anilbeesetti/nextplayer/navigation/NetworkNavGraph.kt
+package dev.anilbeesetti.nextplayer.navigation
+
+import android.content.Context
+import androidx.navigation3.runtime.EntryProviderScope
+import androidx.navigation3.runtime.NavBackStack
+import androidx.navigation3.runtime.NavKey
+import dev.anilbeesetti.nextplayer.feature.network.navigation.addConnectionEntry
+import dev.anilbeesetti.nextplayer.feature.network.navigation.navigateToAddConnection
+import dev.anilbeesetti.nextplayer.feature.network.navigation.navigateToNetworkBrowse
+import dev.anilbeesetti.nextplayer.feature.network.navigation.networkBrowseEntry
+import dev.anilbeesetti.nextplayer.feature.network.navigation.networkEntry
+import dev.anilbeesetti.nextplayer.settings.navigation.navigateToSettings
+
+fun EntryProviderScope<NavKey>.networkNavGraph(context: Context, backStack: NavBackStack<NavKey>) {
+    networkEntry(
+        onAddConnection = { backStack.navigateToAddConnection() },
+        onEditConnection = { id -> backStack.navigateToAddConnection(connectionId = id) },
+        onOpenConnection = { id -> backStack.navigateToNetworkBrowse(connectionId = id) },
+        onSettingsClick = backStack::navigateToSettings,
+        onOpenStream = { uri -> context.startPlayback(uri = uri) },
+    )
+
+    addConnectionEntry(
+        onNavigateUp = { backStack.removeLastIfNotRoot() },
+    )
+
+    networkBrowseEntry(
+        onNavigateUp = { backStack.removeLastIfNotRoot() },
+        onPlayVideos = { uris, startUri ->
+            context.startPlayback(
+                uris = uris,
+                startUri = startUri,
+            )
+        },
+        onNavigateToFolder = { id, path ->
+            backStack.navigateToNetworkBrowse(
+                connectionId = id,
+                path = path,
+            )
+        },
+    )
+}
+
+--- app/src/main/java/dev/anilbeesetti/nextplayer/navigation/PlaylistNavGraph.kt
+package dev.anilbeesetti.nextplayer.navigation
+
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
+import androidx.navigation3.runtime.EntryProviderScope
+import androidx.navigation3.runtime.NavBackStack
+import androidx.navigation3.runtime.NavKey
+import dev.anilbeesetti.nextplayer.PlaylistShortcut
+import dev.anilbeesetti.nextplayer.core.ui.R
+import dev.anilbeesetti.nextplayer.feature.player.PlayerActivity
+import dev.anilbeesetti.nextplayer.feature.player.utils.PlaylistPlaybackContract
+import dev.anilbeesetti.nextplayer.feature.playlist.navigation.PlaylistDetailRoute
+import dev.anilbeesetti.nextplayer.feature.playlist.navigation.PlaylistListRoute
+import dev.anilbeesetti.nextplayer.feature.playlist.navigation.navigateToPlaylistDetail
+import dev.anilbeesetti.nextplayer.feature.playlist.navigation.playlistDetailEntry
+import dev.anilbeesetti.nextplayer.feature.playlist.navigation.playlistListEntry
+import dev.anilbeesetti.nextplayer.settings.navigation.navigateToSettings
+
+fun EntryProviderScope<NavKey>.playlistNavGraph(
+    context: Context,
+    backStack: NavBackStack<NavKey>,
+) {
+    playlistListEntry(
+        onPlaylistClick = backStack::navigateToPlaylistDetail,
+        onSettingsClick = backStack::navigateToSettings,
+        onAddToHomeScreen = if (PlaylistShortcut.isSupported(context = context)) {
+            { playlist ->
+                if (!PlaylistShortcut.requestPin(
+                        context = context,
+                        playlist = playlist,
+                    )
+                ) {
+                    Toast.makeText(
+                        context,
+                        R.string.playlist_shortcut_failed,
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                }
+            }
+        } else {
+            null
+        },
+    )
+
+    playlistDetailEntry(
+        onNavigateUp = { backStack.removeLastIfNotRoot() },
+        onPlayPlaylist = { playlistId, startUri ->
+            context.startPlaylistPlayback(
+                playlistId = playlistId,
+                startUri = startUri,
+            )
+        },
+    )
+}
+
+internal fun TopLevelNavState.openPlaylist(playlistId: Long) {
+    val playlistStack = backStacks.getValue(key = PlaylistListRoute)
+    playlistStack.clear()
+    playlistStack.add(element = PlaylistListRoute)
+    playlistStack.add(element = PlaylistDetailRoute(playlistId = playlistId))
+    switchTo(route = PlaylistListRoute)
+}
+
+internal fun Context.startPlaylistPlayback(playlistId: Long, startUri: Uri) {
+    startActivity(
+        Intent(
+            this,
+            PlayerActivity::class.java,
+        ).apply {
+            action = Intent.ACTION_VIEW
+            data = startUri
+            putExtra(
+                PlaylistPlaybackContract.EXTRA_PLAYLIST_ID,
+                playlistId,
+            )
+        },
+    )
+}
+
+--- app/src/main/java/dev/anilbeesetti/nextplayer/navigation/SettingsNavGraph.kt
+package dev.anilbeesetti.nextplayer.navigation
+
+import androidx.navigation3.runtime.EntryProviderScope
+import androidx.navigation3.runtime.NavBackStack
+import androidx.navigation3.runtime.NavKey
+import dev.anilbeesetti.nextplayer.settings.Setting
+import dev.anilbeesetti.nextplayer.settings.navigation.aboutPreferencesEntry
+import dev.anilbeesetti.nextplayer.settings.navigation.appearancePreferencesEntry
+import dev.anilbeesetti.nextplayer.settings.navigation.audioPreferencesEntry
+import dev.anilbeesetti.nextplayer.settings.navigation.folderPreferencesEntry
+import dev.anilbeesetti.nextplayer.settings.navigation.generalPreferencesEntry
+import dev.anilbeesetti.nextplayer.settings.navigation.gesturePreferencesEntry
+import dev.anilbeesetti.nextplayer.settings.navigation.librariesEntry
+import dev.anilbeesetti.nextplayer.settings.navigation.mediaLibraryPreferencesEntry
+import dev.anilbeesetti.nextplayer.settings.navigation.navigateToAboutPreferences
+import dev.anilbeesetti.nextplayer.settings.navigation.navigateToAppearancePreferences
+import dev.anilbeesetti.nextplayer.settings.navigation.navigateToAudioPreferences
+import dev.anilbeesetti.nextplayer.settings.navigation.navigateToFolderPreferencesScreen
+import dev.anilbeesetti.nextplayer.settings.navigation.navigateToGeneralPreferences
+import dev.anilbeesetti.nextplayer.settings.navigation.navigateToGesturePreferences
+import dev.anilbeesetti.nextplayer.settings.navigation.navigateToLibraries
+import dev.anilbeesetti.nextplayer.settings.navigation.navigateToMediaLibraryPreferencesScreen
+import dev.anilbeesetti.nextplayer.settings.navigation.navigateToPlayerPreferences
+import dev.anilbeesetti.nextplayer.settings.navigation.navigateToSubtitlePreferences
+import dev.anilbeesetti.nextplayer.settings.navigation.navigateToThumbnailPreferencesScreen
+import dev.anilbeesetti.nextplayer.settings.navigation.playerPreferencesEntry
+import dev.anilbeesetti.nextplayer.settings.navigation.settingsEntry
+import dev.anilbeesetti.nextplayer.settings.navigation.subtitlePreferencesEntry
+import dev.anilbeesetti.nextplayer.settings.navigation.thumbnailPreferencesEntry
+
+fun EntryProviderScope<NavKey>.settingsNavGraph(backStack: NavBackStack<NavKey>) {
+    settingsEntry(
+        onNavigateUp = { backStack.removeLastIfNotRoot() },
+        onItemClick = { setting ->
+            when (setting) {
+                Setting.APPEARANCE -> backStack.navigateToAppearancePreferences()
+                Setting.MEDIA_LIBRARY -> backStack.navigateToMediaLibraryPreferencesScreen()
+                Setting.PLAYER -> backStack.navigateToPlayerPreferences()
+                Setting.GESTURES -> backStack.navigateToGesturePreferences()
+                Setting.AUDIO -> backStack.navigateToAudioPreferences()
+                Setting.SUBTITLE -> backStack.navigateToSubtitlePreferences()
+                Setting.GENERAL -> backStack.navigateToGeneralPreferences()
+                Setting.ABOUT -> backStack.navigateToAboutPreferences()
+            }
+        },
+    )
+    appearancePreferencesEntry(
+        onNavigateUp = { backStack.removeLastIfNotRoot() },
+    )
+    mediaLibraryPreferencesEntry(
+        onNavigateUp = { backStack.removeLastIfNotRoot() },
+        onFolderSettingClick = backStack::navigateToFolderPreferencesScreen,
+        onThumbnailSettingClick = backStack::navigateToThumbnailPreferencesScreen,
+    )
+    thumbnailPreferencesEntry(
+        onNavigateUp = { backStack.removeLastIfNotRoot() },
+    )
+    folderPreferencesEntry(
+        onNavigateUp = { backStack.removeLastIfNotRoot() },
+    )
+    playerPreferencesEntry(
+        onNavigateUp = { backStack.removeLastIfNotRoot() },
+    )
+    gesturePreferencesEntry(
+        onNavigateUp = { backStack.removeLastIfNotRoot() },
+    )
+    audioPreferencesEntry(
+        onNavigateUp = { backStack.removeLastIfNotRoot() },
+    )
+    subtitlePreferencesEntry(
+        onNavigateUp = { backStack.removeLastIfNotRoot() },
+    )
+    generalPreferencesEntry(
+        onNavigateUp = { backStack.removeLastIfNotRoot() },
+    )
+    aboutPreferencesEntry(
+        onLibrariesClick = backStack::navigateToLibraries,
+        onNavigateUp = { backStack.removeLastIfNotRoot() },
+    )
+    librariesEntry(
+        onNavigateUp = { backStack.removeLastIfNotRoot() },
+    )
+}
+
+--- app/src/main/java/dev/anilbeesetti/nextplayer/navigation/TopLevelNavigation.kt
+package dev.anilbeesetti.nextplayer.navigation
+
+import android.os.Build
+import android.view.RoundedCorner
+import androidx.annotation.StringRes
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.BoundsTransform
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.animateBounds
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.Transition
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.AbsoluteRoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationRail
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.MutableIntState
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.movableContentOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.runtime.toMutableStateList
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LookaheadScope
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
+import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
+import androidx.navigation3.runtime.NavBackStack
+import androidx.navigation3.runtime.NavEntry
+import androidx.navigation3.runtime.NavEntryDecorator
+import androidx.navigation3.runtime.NavKey
+import androidx.navigation3.runtime.rememberDecoratedNavEntries
+import androidx.navigation3.runtime.rememberNavBackStack
+import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
+import androidx.navigation3.scene.Scene
+import androidx.navigation3.ui.LocalNavAnimatedContentScope
+import dev.anilbeesetti.nextplayer.core.common.extensions.isTelevision
+import dev.anilbeesetti.nextplayer.core.ui.R
+import dev.anilbeesetti.nextplayer.core.ui.components.TopLevelFabKey
+import dev.anilbeesetti.nextplayer.core.ui.components.TopLevelFabState
+import dev.anilbeesetti.nextplayer.core.ui.components.thenIf
+import dev.anilbeesetti.nextplayer.core.ui.components.tvFocusRing
+import dev.anilbeesetti.nextplayer.core.ui.designsystem.NextIcons
+import dev.anilbeesetti.nextplayer.feature.more.navigation.MoreRoute
+import dev.anilbeesetti.nextplayer.feature.network.navigation.NetworkRoute
+import dev.anilbeesetti.nextplayer.feature.playlist.navigation.PlaylistListRoute
+import dev.anilbeesetti.nextplayer.feature.videopicker.navigation.MediaPickerRoute
+
+/**
+ * Top-level destinations shown in the bottom bar / nav rail. The first entry is the start (exit)
+ * destination — pressing back from any other tab returns here before leaving the app.
+ */
+enum class TopLevelDestination(
+    val route: NavKey,
+    val icon: ImageVector,
+    @StringRes val labelRes: Int,
+    val fabKey: String? = null,
+) {
+    MEDIA(
+        MediaPickerRoute(),
+        NextIcons.Home,
+        R.string.home,
+        TopLevelFabKey.MEDIA,
+    ),
+    PLAYLISTS(
+        PlaylistListRoute,
+        NextIcons.Playlist,
+        R.string.playlists,
+        TopLevelFabKey.PLAYLISTS,
+    ),
+    NETWORK(
+        NetworkRoute,
+        NextIcons.Network,
+        R.string.network,
+        TopLevelFabKey.NETWORK,
+    ),
+    MORE(
+        MoreRoute,
+        NextIcons.More,
+        R.string.more,
+        TopLevelFabKey.MORE,
+    ),
+}
+
+@Composable
+fun rememberTopLevelNavState(): TopLevelNavState {
+    val destinations = TopLevelDestination.entries
+    // Each tab keeps its own back stack; rememberNavBackStack persists it across config change and
+    // process death.
+    val backStacks = destinations.associate { dest ->
+        val backStack = rememberNavBackStack(dest.route)
+        backStack.ensureRoot(dest.route)
+        dest.route to backStack
+    }
+    val selectedIndex = rememberSaveable { mutableIntStateOf(value = 0) }
+    return remember(
+        backStacks,
+        selectedIndex,
+    ) {
+        TopLevelNavState(
+            destinations = destinations,
+            backStacks = backStacks,
+            selectedIndexState = selectedIndex,
+        )
+    }
+}
+
+/**
+ * Holds the per-tab back stacks and the currently selected tab, and flattens them into the single
+ * list of entries that [androidx.navigation3.ui.NavDisplay] renders.
+ *
+ * The start tab's stack is always kept at the base, so a non-start tab is displayed *on top* of it;
+ * this makes back navigation from a secondary tab fall through to the start tab.
+ */
+@Stable
+class TopLevelNavState(
+    val destinations: List<TopLevelDestination>,
+    val backStacks: Map<NavKey, NavBackStack<NavKey>>,
+    private val selectedIndexState: MutableIntState,
+) {
+    var selectedIndex by selectedIndexState
+        private set
+
+    private val startRoute: NavKey get() = destinations.first().route
+
+    val topLevelRoute: NavKey get() = destinations[selectedIndex].route
+
+    /** The back stack of the currently selected tab — navigation targets are added here. */
+    val currentStack: NavBackStack<NavKey> get() = backStacks.getValue(key = topLevelRoute)
+
+    private val stacksInUse: List<NavKey>
+        get() = if (selectedIndex == 0) {
+            listOf(element = startRoute)
+        } else {
+            listOf(
+                startRoute,
+                topLevelRoute,
+            )
+        }
+
+    /** Raw routes and Navigation 3 content keys for the top-level destinations. */
+    val topLevelContentKeys: Set<Any> = destinations.flatMap { dest ->
+        listOf(
+            dest.route,
+            NavEntry(key = dest.route) {}.contentKey,
+        )
+    }.toSet()
+
+    fun switchTo(route: NavKey) {
+        val index = destinations.indexOfFirst { it.route == route }
+        if (index >= 0) selectedIndex = index
+    }
+
+    fun goBack() {
+        val stack = currentStack
+        when {
+            stack.size > 1 -> stack.removeLastOrNull()
+            selectedIndex != 0 -> selectedIndex = 0
+        }
+    }
+
+
+=================== every mention of network streaming outside the network module (file:line)
+./settings.gradle.kts:41:include(":feature:network")
+./app/src/main/java/dev/anilbeesetti/nextplayer/navigation/TopLevelNavigation.kt:104:import dev.anilbeesetti.nextplayer.feature.network.navigation.NetworkRoute
+./app/src/main/java/dev/anilbeesetti/nextplayer/navigation/TopLevelNavigation.kt:131:        NetworkRoute,
+./app/src/main/java/dev/anilbeesetti/nextplayer/navigation/NetworkNavGraph.kt:7:import dev.anilbeesetti.nextplayer.feature.network.navigation.addConnectionEntry
+./app/src/main/java/dev/anilbeesetti/nextplayer/navigation/NetworkNavGraph.kt:8:import dev.anilbeesetti.nextplayer.feature.network.navigation.navigateToAddConnection
+./app/src/main/java/dev/anilbeesetti/nextplayer/navigation/NetworkNavGraph.kt:9:import dev.anilbeesetti.nextplayer.feature.network.navigation.navigateToNetworkBrowse
+./app/src/main/java/dev/anilbeesetti/nextplayer/navigation/NetworkNavGraph.kt:10:import dev.anilbeesetti.nextplayer.feature.network.navigation.networkBrowseEntry
+./app/src/main/java/dev/anilbeesetti/nextplayer/navigation/NetworkNavGraph.kt:11:import dev.anilbeesetti.nextplayer.feature.network.navigation.networkEntry
+./app/src/main/java/dev/anilbeesetti/nextplayer/AppModule.kt:13:import dev.anilbeesetti.nextplayer.feature.network.NetworkModule
+./app/src/androidTest/java/dev/anilbeesetti/nextplayer/KoinGraphTest.kt:21:import dev.anilbeesetti.nextplayer.feature.network.screens.addconnection.AddConnectionViewModel
+./app/src/androidTest/java/dev/anilbeesetti/nextplayer/KoinGraphTest.kt:22:import dev.anilbeesetti.nextplayer.feature.network.screens.browse.NetworkBrowseViewModel
+./app/src/androidTest/java/dev/anilbeesetti/nextplayer/KoinGraphTest.kt:23:import dev.anilbeesetti.nextplayer.feature.network.screens.list.NetworkViewModel
+./app/build.gradle.kts:119:    implementation(project(":feature:network"))
+
+=================== player: buttons, ui and state files with line counts
+   227 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/MediaPlayerControls.kt
+   293 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/MediaPlayerScreen.kt
+   713 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/PlayerActivity.kt
+   113 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/PlayerContentFrame.kt
+   136 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/PlayerControls.kt
+    40 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/PlayerLockedControls.kt
+     9 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/PlayerModule.kt
+   217 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/PlayerViewModel.kt
+    37 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/buttons/NextButton.kt
+    40 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/buttons/PlayPauseButton.kt
+    57 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/buttons/PlaybackSpeedButton.kt
+   128 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/buttons/PlayerButton.kt
+    37 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/buttons/PreviousButton.kt
+    50 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/buttons/RepeatButton.kt
+    30 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/buttons/RotateButton.kt
+    47 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/buttons/ShuffleButton.kt
+    49 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/extensions/Activity.kt
+    16 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/extensions/Duration.kt
+     7 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/extensions/Enum.kt
+    11 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/extensions/Font.kt
+    14 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/extensions/ImageButton.kt
+    20 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/extensions/MappedTrackInfo.kt
+   190 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/extensions/MediaItem.kt
+    15 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/extensions/Modifier.kt
+    38 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/extensions/OpenDocumentAtInitialUri.kt
+   129 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/extensions/Player.kt
+    14 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/extensions/PlayerView.kt
+   294 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/extensions/PointerInputScope.kt
+    20 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/extensions/ScreenOrientation.kt
+    43 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/extensions/TrackGroup.kt
+    80 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/extensions/Uri.kt
+    27 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/extensions/VideoContentScale.kt
+     6 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/extensions/VideoSize.kt
+    29 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/model/DecoderModeUi.kt
+    28 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/model/DecoderRecoveryState.kt
+    10 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/model/Subtitle.kt
+    60 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/service/ApiMediaSourceFactory.kt
+    76 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/service/BackgroundPlayback.kt
+   280 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/service/CustomCommands.kt
+   129 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/service/DecoderRecoveryManager.kt
+    31 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/service/ExternalAudioMediaSourceFactory.kt
+  1451 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/service/PlayerService.kt
+   117 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/state/BrightnessState.kt
+   119 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/state/ChaptersState.kt
+   111 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/state/ControlsVisibilityState.kt
+    74 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/state/CuesState.kt
+    42 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/state/ErrorState.kt
+    70 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/state/MediaController.kt
+    37 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/state/MediaPresentationState.kt
+    46 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/state/MetadataState.kt
+   316 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/state/PictureInPictureState.kt
+    82 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/state/PlaybackParametersState.kt
+   236 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/state/PlayerKeyInputState.kt
+    95 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/state/PlaylistState.kt
+    93 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/state/RotationState.kt
+   145 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/state/SeekGestureState.kt
+   148 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/state/SubtitleOptionsState.kt
+   111 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/state/SubtitlePositionState.kt
+   147 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/state/TapGestureState.kt
+    54 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/state/TracksState.kt
+   175 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/state/VideoZoomAndContentScaleState.kt
+   137 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/state/VolumeAndBrightnessGestureState.kt
+   236 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/state/VolumeState.kt
+   106 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/ui/AudioTrackSelectorView.kt
+    79 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/ui/ChaptersView.kt
+   155 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/ui/DecoderSelectorView.kt
+   239 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/ui/DoubleTapIndicator.kt
+   104 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/ui/OverlayShowView.kt
+   134 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/ui/OverlayView.kt
+   203 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/ui/PlaybackSpeedSelectorView.kt
+    90 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/ui/PlayerErrorDialogs.kt
+   194 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/ui/PlayerFeedback.kt
+   214 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/ui/PlayerGestures.kt
+   300 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/ui/PlaylistView.kt
+    52 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/ui/RadioButtonRow.kt
+    17 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/ui/ShutterView.kt
+   297 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/ui/SubtitleSelectorView.kt
+   263 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/ui/SubtitleView.kt
+   138 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/ui/VerticalProgressView.kt
+    49 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/ui/VideoContentScaleSelectorView.kt
+   309 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/ui/controls/ControlsBottomView.kt
+    61 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/ui/controls/ControlsMiddleView.kt
+   136 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/ui/controls/ControlsTopView.kt
+   397 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/ui/controls/PlayerSeekbar.kt
+    61 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/ui/preview/PreviewPlayer.kt
+   286 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/utils/PlayerApi.kt
+    58 feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/utils/PlaylistPlaybackContract.kt
+ 11774 total
+
+=================== player and decoder settings model
+
+--- core/model/src/main/java/dev/anilbeesetti/nextplayer/core/model/PlayerPreferences.kt
+package dev.anilbeesetti.nextplayer.core.model
+
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class PlayerPreferences(
+    val resume: Resume = Resume.YES,
+    val rememberPlayerBrightness: Boolean = false,
+    val playerBrightness: Float = 0.5f,
+    val minDurationForFastSeek: Long = 120000L,
+    val rememberSelections: Boolean = true,
+    val playerScreenOrientation: ScreenOrientation = ScreenOrientation.VIDEO_ORIENTATION,
+    val playerVideoZoom: VideoContentScale = VideoContentScale.BEST_FIT,
+    val defaultPlaybackSpeed: Float = 1.0f,
+    val autoplay: Boolean = true,
+    val enableTunneledPlayback: Boolean = false,
+    val autoPip: Boolean = true,
+    val autoBackgroundPlay: Boolean = false,
+    val loopMode: LoopMode = LoopMode.OFF,
+
+    // Controls (Gestures)
+    @Deprecated(
+        message =
+            "Use individual enableVolumeSwipeGesture and enableBrightnessSwipeGesture instead",
+    )
+    val useSwipeControls: Boolean = true,
+    val enableVolumeSwipeGesture: Boolean = true,
+    val enableBrightnessSwipeGesture: Boolean = true,
+    val useSeekControls: Boolean = true,
+    val useZoomControls: Boolean = true,
+    val enablePanGesture: Boolean = false,
+    val doubleTapGesture: DoubleTapGesture = DoubleTapGesture.BOTH,
+    val useLongPressControls: Boolean = false,
+    val longPressControlsSpeed: Float = 2.0f,
+    val seekIncrement: Int = DEFAULT_SEEK_INCREMENT,
+    val seekSensitivity: Float = DEFAULT_SEEK_SENSITIVITY,
+    val volumeGestureSensitivity: Float = DEFAULT_VOLUME_GESTURE_SENSITIVITY,
+    val brightnessGestureSensitivity: Float = DEFAULT_BRIGHTNESS_GESTURE_SENSITIVITY,
+
+    // Player Interface
+    val controllerAutoHideTimeout: Int = DEFAULT_CONTROLLER_AUTO_HIDE_TIMEOUT,
+    val controlButtonsPosition: ControlButtonsPosition = ControlButtonsPosition.LEFT,
+    val hidePlayerButtonsBackground: Boolean = false,
+    val useMaterialYouControls: Boolean = false,
+    val showRemainingTime: Boolean = false,
+
+    // Audio Preferences
+    val preferredAudioLanguage: String = "",
+    val pauseOnHeadsetDisconnect: Boolean = true,
+    val requireAudioFocus: Boolean = true,
+    val showSystemVolumePanel: Boolean = true,
+    val enableVolumeBoost: Boolean = false,
+
+    // Subtitle Preferences
+    val useSystemCaptionStyle: Boolean = false,
+    val preferredSubtitleLanguage: String = "",
+    val subtitleTextEncoding: String = "",
+    val subtitleTextSize: Int = DEFAULT_SUBTITLE_TEXT_SIZE,
+    val subtitleBackground: Boolean = false,
+    val subtitleFont: Font = Font.DEFAULT,
+    val subtitleTextBold: Boolean = true,
+    val applyEmbeddedStyles: Boolean = true,
+    // Vertical distance from the default subtitle spot, as a fraction of the player height.
+    val subtitleOffsetY: Float = 0f,
+) {
+
+    companion object {
+        const val DEFAULT_SEEK_INCREMENT = 10
+        const val DEFAULT_SEEK_SENSITIVITY = 0.50f
+        const val DEFAULT_VOLUME_GESTURE_SENSITIVITY = 0.50f
+        const val DEFAULT_BRIGHTNESS_GESTURE_SENSITIVITY = 0.50f
+        const val DEFAULT_SUBTITLE_TEXT_SIZE = 20
+        const val DEFAULT_CONTROLLER_AUTO_HIDE_TIMEOUT = 4
+    }
+}
+
+=================== decoder, ffmpeg and subtitle mentions (file:line)
+./settings.gradle.kts:17:// Opt in with -PnextlibPath=../nextlib to test unpublished decoder changes.
+./settings.gradle.kts:18:providers.gradleProperty("nextlibPath").orNull?.let { nextlibPath ->
+./settings.gradle.kts:19:    includeBuild(nextlibPath) {
+./settings.gradle.kts:22:                module("io.github.anilbeesetti:nextlib-media3ext"),
+./settings.gradle.kts:25:                module("io.github.anilbeesetti:nextlib-mediainfo"),
+./gradle/libs.versions.toml:43:nextlib = "1.11.1-0.18.0"
+./gradle/libs.versions.toml:108:github-anilbeesetti-nextlib-media3ext = { group = "io.github.anilbeesetti", name = "nextlib-media3ext", version.ref = "nextlib" }
+./gradle/libs.versions.toml:109:github-anilbeesetti-nextlib-mediainfo = { group = "io.github.anilbeesetti", name = "nextlib-mediainfo", version.ref = "nextlib" }
+./feature/player/src/test/java/dev/anilbeesetti/nextplayer/feature/player/PlayerViewModelTest.kt:9:import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.DecoderMode
+./feature/player/src/test/java/dev/anilbeesetti/nextplayer/feature/player/service/DecoderServiceStateTest.kt:6:import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.DecoderMode
+./feature/player/src/test/java/dev/anilbeesetti/nextplayer/feature/player/service/DecoderServiceStateTest.kt:25:                DecoderMode.FFMPEG.name,
+./feature/player/src/test/java/dev/anilbeesetti/nextplayer/feature/player/service/DecoderServiceStateTest.kt:46:            DecoderMode.FFMPEG,
+./feature/player/src/test/java/dev/anilbeesetti/nextplayer/feature/player/service/DecoderRecoveryManagerTest.kt:5:import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.DecoderMode
+./feature/player/src/test/java/dev/anilbeesetti/nextplayer/feature/player/service/DecoderRecoveryManagerTest.kt:16:    fun automaticFailureRetriesFfmpegOnce() {
+./feature/player/src/test/java/dev/anilbeesetti/nextplayer/feature/player/service/DecoderRecoveryManagerTest.kt:21:                DecoderMode.FFMPEG,
+./feature/player/src/test/java/dev/anilbeesetti/nextplayer/feature/player/service/DecoderRecoveryManagerTest.kt:46:                DecoderMode.FFMPEG,
+./feature/player/src/test/java/dev/anilbeesetti/nextplayer/feature/player/service/DecoderRecoveryManagerTest.kt:87:                DecoderMode.FFMPEG,
+./feature/player/src/test/java/dev/anilbeesetti/nextplayer/feature/player/service/DecoderRecoveryManagerTest.kt:97:                DecoderMode.FFMPEG,
+./feature/player/src/test/java/dev/anilbeesetti/nextplayer/feature/player/service/DecoderRecoveryManagerTest.kt:107:    fun explicitFfmpegReturnsToAutomaticWithoutLooping() {
+./feature/player/src/test/java/dev/anilbeesetti/nextplayer/feature/player/service/DecoderRecoveryManagerTest.kt:111:            DecoderMode.FFMPEG,
+./feature/player/src/test/java/dev/anilbeesetti/nextplayer/feature/player/service/DecoderRecoveryManagerTest.kt:116:                DecoderMode.FFMPEG,
+./feature/player/src/test/java/dev/anilbeesetti/nextplayer/feature/player/service/DecoderRecoveryManagerTest.kt:152:            DecoderMode.FFMPEG,
+./feature/player/src/test/java/dev/anilbeesetti/nextplayer/feature/player/service/DecoderRecoveryManagerTest.kt:169:                DecoderMode.FFMPEG,
+./feature/player/src/test/java/dev/anilbeesetti/nextplayer/feature/player/service/DecoderRecoveryManagerTest.kt:196:                DecoderMode.FFMPEG,
+./feature/player/src/test/java/dev/anilbeesetti/nextplayer/feature/player/extensions/PlayerTest.kt:10:import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.DecoderMode
+./feature/player/src/test/java/dev/anilbeesetti/nextplayer/feature/player/extensions/PlayerTest.kt:56:                    audioDecoderMode = DecoderMode.FFMPEG,
+./feature/player/src/test/java/dev/anilbeesetti/nextplayer/feature/player/extensions/PlayerTest.kt:121:                            it.mediaMetadata.audioDecoderMode == DecoderMode.FFMPEG
+./feature/player/src/test/java/dev/anilbeesetti/nextplayer/feature/player/extensions/MediaItemTest.kt:5:import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.DecoderMode
+./feature/player/src/test/java/dev/anilbeesetti/nextplayer/feature/player/extensions/ExternalAudioTest.kt:9:import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.DecoderMode
+./feature/player/src/test/java/dev/anilbeesetti/nextplayer/feature/player/utils/PlayerApiTest.kt:10:import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.DecoderMode
+./feature/player/src/test/java/dev/anilbeesetti/nextplayer/feature/player/utils/PlayerApiTest.kt:587:            DecoderMode.FFMPEG,
+./feature/player/src/test/java/dev/anilbeesetti/nextplayer/feature/player/utils/PlayerApiTest.kt:687:            2 to DecoderMode.FFMPEG,
+./feature/player/src/test/java/dev/anilbeesetti/nextplayer/feature/player/utils/PlayerApiTest.kt:775:            DecoderMode.FFMPEG,
+./feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/ui/OverlayShowView.kt:13:import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.DecoderMode
+./feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/ui/controls/ControlsTopView.kt:39:import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.DecoderMode
+./feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/ui/DecoderSelectorView.kt:36:import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.DecoderMode
+./feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/PlayerViewModel.kt:17:import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.DecoderMode
+./feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/PlayerActivity.kt:58:import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.DecoderMode
+./feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/service/ApiMediaSourceFactory.kt:11:import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.FfmpegSubtitleExtractorsFactory
+./feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/service/ApiMediaSourceFactory.kt:12:import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.withFfmpegSubtitles
+./feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/service/ApiMediaSourceFactory.kt:29:            FfmpegSubtitleExtractorsFactory(),
+./feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/service/ApiMediaSourceFactory.kt:32:            .withFfmpegSubtitles(sources)
+./feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/service/PlayerService.kt:80:import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.DecoderManager
+./feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/service/PlayerService.kt:81:import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.DecoderMode
+./feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/service/PlayerService.kt:82:import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.NextRenderersFactory
+./feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/service/PlayerService.kt:83:import io.github.anilbeesetti.nextlib.media3ext.renderer.subtitleDelayMilliseconds
+./feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/service/PlayerService.kt:84:import io.github.anilbeesetti.nextlib.media3ext.renderer.subtitleSpeed
+./feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/service/PlayerService.kt:85:import io.github.anilbeesetti.nextlib.mediainfo.MediaInfoBuilder
+./feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/service/DecoderRecoveryManager.kt:6:import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.DecoderMode
+./feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/service/DecoderRecoveryManager.kt:8:/** Keeps NextPlayer's decoder fallback policy separate from nextlib's decoder switching. */
+./feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/service/DecoderRecoveryManager.kt:119:    DecoderMode.AUTO -> listOf(DecoderMode.FFMPEG)
+./feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/service/DecoderRecoveryManager.kt:123:        DecoderMode.FFMPEG,
+./feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/service/DecoderRecoveryManager.kt:126:    DecoderMode.SOFTWARE -> listOf(DecoderMode.FFMPEG)
+./feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/service/DecoderRecoveryManager.kt:128:    DecoderMode.FFMPEG -> listOf(DecoderMode.AUTO)
+./feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/service/CustomCommands.kt:12:import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.DecoderMode
+./feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/model/DecoderModeUi.kt:5:import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.DecoderMode
+./feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/model/DecoderModeUi.kt:10:    DecoderMode.FFMPEG,
+./feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/model/DecoderModeUi.kt:19:        DecoderMode.FFMPEG -> R.string.decoder_mode_app_software
+./feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/model/DecoderModeUi.kt:28:        DecoderMode.FFMPEG -> R.string.decoder_app_software_description
+./feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/model/DecoderRecoveryState.kt:3:import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.DecoderMode
+./feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/extensions/MediaItem.kt:9:import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.DecoderMode
+./feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/PlayerControls.kt:32:import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.DecoderMode
+./feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/utils/PlayerApi.kt:13:import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.DecoderMode
+./feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/utils/PlayerApi.kt:58:            2 -> DecoderMode.FFMPEG
+./feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/utils/PlayerApi.kt:198:            DecoderMode.FFMPEG, DecoderMode.SOFTWARE -> putExtra(
+./feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/state/SubtitleOptionsState.kt:23:import io.github.anilbeesetti.nextlib.media3ext.renderer.subtitleDelayMilliseconds
+./feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player/state/SubtitleOptionsState.kt:24:import io.github.anilbeesetti.nextlib.media3ext.renderer.subtitleSpeed
+./feature/player/build.gradle.kts:76:    implementation(libs.github.anilbeesetti.nextlib.media3ext)
+./feature/player/build.gradle.kts:77:    implementation(libs.github.anilbeesetti.nextlib.mediainfo)
+./app/src/main/java/dev/anilbeesetti/nextplayer/VideoThumbnailDecoder.kt:30:import io.github.anilbeesetti.nextlib.mediainfo.MediaThumbnailRetriever
+./app/src/main/java/dev/anilbeesetti/nextplayer/VideoThumbnailDecoder.kt:105:            MediaThumbnailRetriever().use { ffmpegRetriever ->
+./app/src/main/java/dev/anilbeesetti/nextplayer/VideoThumbnailDecoder.kt:108:                    ffmpegRetriever.setDataSource(source = source)
+./app/src/main/java/dev/anilbeesetti/nextplayer/VideoThumbnailDecoder.kt:109:                    ffmpegRetriever
+./app/src/main/java/dev/anilbeesetti/nextplayer/VideoThumbnailDecoder.kt:111:                    // FFmpeg can fail to reopen a trashed MediaStore descriptor even
+./app/src/androidTest/java/dev/anilbeesetti/nextplayer/LocalSubtitleTest.kt:24:import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.DecoderMode
+./app/src/androidTest/java/dev/anilbeesetti/nextplayer/FfmpegSubtitlePlaybackTest.kt:39:class FfmpegSubtitlePlaybackTest {
+./app/src/androidTest/java/dev/anilbeesetti/nextplayer/FfmpegSubtitlePlaybackTest.kt:48:            "ffmpeg-subtitle-test-${System.nanoTime()}",
+./app/build.gradle.kts:154:    implementation(libs.github.anilbeesetti.nextlib.mediainfo)
+./app/build.gradle.kts:163:    androidTestImplementation(libs.github.anilbeesetti.nextlib.media3ext)
+./core/data/src/main/java/dev/anilbeesetti/nextplayer/core/data/repository/LocalVaultRepository.kt:23:import io.github.anilbeesetti.nextlib.mediainfo.MediaInfoBuilder
+
+=================== player settings screen and gestures
+feature/settings/src/main/java/dev/anilbeesetti/nextplayer/settings/screens/about/AboutPreferencesScreen.kt
+feature/settings/src/main/java/dev/anilbeesetti/nextplayer/settings/screens/about/AboutPreferencesViewModel.kt
+feature/settings/src/main/java/dev/anilbeesetti/nextplayer/settings/screens/about/LibrariesScreen.kt
+feature/settings/src/main/java/dev/anilbeesetti/nextplayer/settings/screens/about/LibrariesViewModel.kt
+feature/settings/src/main/java/dev/anilbeesetti/nextplayer/settings/screens/appearance/AppearancePreferencesScreen.kt
+feature/settings/src/main/java/dev/anilbeesetti/nextplayer/settings/screens/appearance/AppearancePreferencesViewModel.kt
+feature/settings/src/main/java/dev/anilbeesetti/nextplayer/settings/screens/audio/AudioPreferencesScreen.kt
+feature/settings/src/main/java/dev/anilbeesetti/nextplayer/settings/screens/audio/AudioPreferencesViewModel.kt
+feature/settings/src/main/java/dev/anilbeesetti/nextplayer/settings/screens/general/GeneralPreferencesScreen.kt
+feature/settings/src/main/java/dev/anilbeesetti/nextplayer/settings/screens/general/GeneralPreferencesViewModel.kt
+feature/settings/src/main/java/dev/anilbeesetti/nextplayer/settings/screens/general/SettingsBackupDialogs.kt
+feature/settings/src/main/java/dev/anilbeesetti/nextplayer/settings/screens/gesture/GesturePreferencesScreen.kt
+feature/settings/src/main/java/dev/anilbeesetti/nextplayer/settings/screens/gesture/GesturePreferencesViewModel.kt
+feature/settings/src/main/java/dev/anilbeesetti/nextplayer/settings/screens/medialibrary/FolderPreferencesScreen.kt
+feature/settings/src/main/java/dev/anilbeesetti/nextplayer/settings/screens/medialibrary/FolderPreferencesViewModel.kt
+feature/settings/src/main/java/dev/anilbeesetti/nextplayer/settings/screens/medialibrary/MediaLibraryPreferencesScreen.kt
+feature/settings/src/main/java/dev/anilbeesetti/nextplayer/settings/screens/medialibrary/MediaLibraryPreferencesViewModel.kt
+feature/settings/src/main/java/dev/anilbeesetti/nextplayer/settings/screens/player/PlayerPreferencesScreen.kt
+feature/settings/src/main/java/dev/anilbeesetti/nextplayer/settings/screens/player/PlayerPreferencesViewModel.kt
+feature/settings/src/main/java/dev/anilbeesetti/nextplayer/settings/screens/subtitle/SubtitlePreferencesScreen.kt
+feature/settings/src/main/java/dev/anilbeesetti/nextplayer/settings/screens/subtitle/SubtitlePreferencesViewModel.kt
+feature/settings/src/main/java/dev/anilbeesetti/nextplayer/settings/screens/thumbnail/ThumbnailPreferencesScreen.kt
+feature/settings/src/main/java/dev/anilbeesetti/nextplayer/settings/screens/thumbnail/ThumbnailPreferencesViewModel.kt
