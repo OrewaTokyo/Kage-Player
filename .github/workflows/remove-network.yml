@@ -1,0 +1,117 @@
+name: Remove network streaming
+on:
+  workflow_dispatch:
+    inputs:
+      start_build:
+        description: "Start an APK build afterwards (true or false)"
+        required: false
+        default: "false"
+permissions:
+  contents: write
+  actions: write
+jobs:
+  remove:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Remove the network module and everything that points to it (stops with no changes if something is still referenced)
+        run: |
+          cat > /tmp/remove_network.py <<'PYEOF'
+          import os, re, subprocess, sys
+
+          def read(p):
+              with open(p, encoding="utf-8") as f:
+                  return f.read()
+
+          def write(p, s):
+              with open(p, "w", encoding="utf-8") as f:
+                  f.write(s)
+
+          def edit(path, fn, must_change=True):
+              if not os.path.isfile(path):
+                  print(f"skip (missing): {path}")
+                  return
+              old = read(path)
+              new = fn(old)
+              if new == old and must_change:
+                  print(f"NOTE: nothing changed in {path}")
+              write(path, new)
+              print(f"edited {path}")
+
+          # 1) Gradle: drop the module
+          edit("settings.gradle.kts", lambda s: re.sub(r'^\s*include\(":feature:network"\)\s*\n', "", s, flags=re.M))
+          edit("app/build.gradle.kts", lambda s: re.sub(r'^\s*implementation\(project\(":feature:network"\)\)\s*\n', "", s, flags=re.M))
+
+          # 2) App: navigation graph file
+          nav = "app/src/main/java/dev/anilbeesetti/nextplayer/navigation/NetworkNavGraph.kt"
+          if os.path.isfile(nav):
+              os.remove(nav)
+              print(f"deleted {nav}")
+
+          # 3) MainActivity
+          def main_activity(s):
+              s = re.sub(r'^import dev\.anilbeesetti\.nextplayer\.navigation\.networkNavGraph\s*\n', "", s, flags=re.M)
+              s = re.sub(r'\n[ \t]*val networkStack = navState\.backStacks\.getValue\(\s*TopLevelDestination\.NETWORK\.route,?\s*\)', "", s)
+              s = re.sub(r'\n[ \t]*networkNavGraph\([^()]*\)', "", s)
+              return s
+          edit("app/src/main/java/dev/anilbeesetti/nextplayer/MainActivity.kt", main_activity)
+
+          # 4) Bottom bar tabs
+          def top_level(s):
+              s = re.sub(r'^import dev\.anilbeesetti\.nextplayer\.feature\.network\.navigation\.NetworkRoute\s*\n', "", s, flags=re.M)
+              s = re.sub(r'\n[ \t]*NETWORK\(\s*NetworkRoute,[^()]*?\),', "", s)
+              return s
+          edit("app/src/main/java/dev/anilbeesetti/nextplayer/navigation/TopLevelNavigation.kt", top_level)
+
+          # 5) Koin module list
+          def app_module(s):
+              s = re.sub(r'^import dev\.anilbeesetti\.nextplayer\.feature\.network\.NetworkModule\s*\n', "", s, flags=re.M)
+              s = re.sub(r'[ \t]*NetworkModule::class,?[ \t]*\n', "", s)
+              s = re.sub(r',?[ \t]*NetworkModule::class', "", s)
+              s = re.sub(r'^[ \t]*[\w.]*NetworkModule\(\)\s*,?\s*\n', "", s, flags=re.M)
+              return s
+          edit("app/src/main/java/dev/anilbeesetti/nextplayer/AppModule.kt", app_module)
+
+          # 6) Instrumented test that wires the network view models (not part of the release build)
+          def koin_test(s):
+              return "\n".join(l for l in s.split("\n") if not re.search(r"feature\.network|NetworkViewModel|NetworkBrowseViewModel|AddConnectionViewModel", l))
+          edit("app/src/androidTest/java/dev/anilbeesetti/nextplayer/KoinGraphTest.kt", koin_test, must_change=False)
+
+          # 7) Remove the module itself
+          if os.path.isdir("feature/network"):
+              subprocess.run(["git", "rm", "-rq", "feature/network"], check=True)
+              print("removed feature/network")
+
+          # 8) Verify nothing in the real code still points at it
+          pat = re.compile(r"feature\.network|NetworkModule|NetworkRoute|networkNavGraph|TopLevelDestination\.NETWORK|:feature:network|\bNETWORK\b")
+          bad = []
+          for root, dirs, files in os.walk("."):
+              dirs[:] = [d for d in dirs if d not in (".git", "build", ".gradle")]
+              for fn in files:
+                  if not fn.endswith((".kt", ".kts", ".xml")):
+                      continue
+                  p = os.path.join(root, fn)
+                  if "/src/test/" in p or "/src/androidTest/" in p:
+                      continue
+                  for n, line in enumerate(read(p).split("\n"), 1):
+                      if pat.search(line) and "const val" not in line:
+                          bad.append(f"{p}:{n}: {line.strip()}")
+          if bad:
+              print("STILL REFERENCED (nothing was committed):")
+              print("\n".join(bad))
+              sys.exit(1)
+          print("clean: no references left")
+          PYEOF
+          python3 /tmp/remove_network.py
+      - name: Commit
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add -A
+          git commit -m "Remove network streaming" || echo "Nothing to commit"
+          git push
+      - name: Start the APK build
+        if: ${{ inputs.start_build == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run build-apk.yml || true
