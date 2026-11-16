@@ -258,6 +258,7 @@ class MainActivity : FragmentActivity() {
                             )
                         }
                     }
+                    KageSplashOverlay()
                 }
             }
         }
