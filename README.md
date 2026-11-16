@@ -1,4 +1,4 @@
-# Next Player
+# Kage Player
 
 An ad-free Android video player, work in progress.
 
