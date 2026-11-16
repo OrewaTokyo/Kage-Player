@@ -45,9 +45,9 @@ jobs:
       - name: Write PROJECT_TREE.txt (so the folder layout can be reviewed)
         run: |
           {
-            echo "== settings.gradle.kts"; grep -hE 'include|rootProject' settings.gradle.kts settings.gradle 2>/dev/null
+            echo "== settings.gradle.kts"; cat settings.gradle.kts settings.gradle 2>/dev/null | grep -E 'include|rootProject' || true
             echo; echo "== folders (res subfolders and build output hidden)"
-            find . -type d -not -path './.git*' -not -path '*/build/*' -not -path '*/res/*' -not -path './node_modules*' -maxdepth 9 | sort
+            find . -maxdepth 9 -type d -not -path './.git*' -not -path '*/build/*' -not -path '*/res/*' | sort
             echo; echo "== Kotlin file count per folder"
             find . -name '*.kt' -not -path '*/build/*' -printf '%h\n' | sort | uniq -c
           } > PROJECT_TREE.txt
