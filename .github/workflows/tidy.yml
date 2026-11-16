@@ -1,0 +1,64 @@
+name: Tidy project
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: write
+jobs:
+  tidy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: English only (remove every other language)
+        run: |
+          # Delete language folders such as values-es, values-zh-rCN, values-b+sr+Latn.
+          # Folders like values-night, values-v31, values-sw600dp, values-land and values-car are not languages and stay.
+          find . -path ./.git -prune -o -type d -name 'values-*' -print | while read -r d; do
+            n=$(basename "$d")
+            if echo "$n" | grep -Eq '^values-([a-z]{2,3})(-r[A-Z]{2})?$|^values-b\+' && [ "$n" != "values-car" ]; then
+              rm -rf "$d"; echo "removed $d"
+            fi
+          done
+          # The language list file and its link in the manifest.
+          find . -path ./.git -prune -o -name 'locales_config.xml' -print | xargs -r rm -f
+          find . -path ./.git -prune -o -name AndroidManifest.xml -print | xargs -r sed -i -E 's# *android:localeConfig="[^"]*"##'
+      - name: Remove store and translation extras (Android app only)
+        run: |
+          rm -rf fastlane .weblate weblate.yml
+          rm -f CONTRIBUTING.md CODE_OF_CONDUCT.md
+          rm -rf ios iosApp
+      - name: Write our own README (the old one was the original project's store page)
+        run: |
+          cat > README.md <<'README'
+          # Next Player
+
+          An ad-free Android video player, work in progress.
+
+          ## Build
+
+          Builds run on GitHub Actions (`build-apk.yml`). Each build is published as a signed APK under Releases.
+
+          ## License
+
+          GNU General Public License v3.0, see `LICENSE`. This app is based on the open-source Next Player by Anil Beesetti.
+          README
+      - name: Write PROJECT_TREE.txt (so the folder layout can be reviewed)
+        run: |
+          {
+            echo "== settings.gradle.kts"; grep -hE 'include|rootProject' settings.gradle.kts settings.gradle 2>/dev/null
+            echo; echo "== folders (res subfolders and build output hidden)"
+            find . -type d -not -path './.git*' -not -path '*/build/*' -not -path '*/res/*' -not -path './node_modules*' -maxdepth 9 | sort
+            echo; echo "== Kotlin file count per folder"
+            find . -name '*.kt' -not -path '*/build/*' -printf '%h\n' | sort | uniq -c
+          } > PROJECT_TREE.txt
+      - name: Commit
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add -A
+          git commit -m "Tidy: English only, own README, remove store extras" || echo "Nothing to commit"
+          git push
+      - name: Start the APK build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run build-apk.yml || true
