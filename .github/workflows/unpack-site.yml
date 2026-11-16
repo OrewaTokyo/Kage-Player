@@ -3,6 +3,11 @@ on:
   push:
     paths: ["site.zip"]
   workflow_dispatch:
+    inputs:
+      source_url:
+        description: "Optional: a zip link to download instead of using site.zip (for the first start, use the default)"
+        required: false
+        default: "https://github.com/anilbeesetti/nextplayer/archive/refs/heads/main.zip"
 permissions:
   contents: write
   actions: write
@@ -11,15 +16,26 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Get the zip
+        run: |
+          if [ -n "${{ inputs.source_url }}" ]; then
+            curl -fL --retry 3 -o site.zip "${{ inputs.source_url }}"
+          fi
+          test -f site.zip || { echo "No site.zip in the repo and no source_url given"; exit 1; }
       - name: Unpack into folders
         run: |
-          test -f site.zip || { echo "site.zip was not found in the repo root"; exit 1; }
-          # site.zip may only carry app source files. Anything that could change the workflows, or that points outside the repo, is refused.
-          if unzip -Z1 site.zip | grep -E '(^|/)\.\.(/|$)|^/|^\.github/|^android-signing/|\.jks$|\.keystore$'; then
-            echo "::error::site.zip holds files this workflow does not unpack (listed above). Change those by hand in GitHub."; exit 1
+          # Paths that point outside the repo are refused.
+          if unzip -Z1 site.zip | grep -E '(^|/)\.\.(/|$)|^/'; then
+            echo "::error::site.zip holds unsafe paths (listed above)."; exit 1
           fi
-          unzip -o site.zip
-          rm site.zip
+          # Workflows, signing files and keys are never taken from a zip. Change those by hand in GitHub.
+          rm -rf /tmp/x && mkdir /tmp/x
+          unzip -q -o site.zip -d /tmp/x -x '.github/*' '*/.github/*' 'android-signing/*' '*/android-signing/*' '*.jks' '*.keystore'
+          # A downloaded GitHub zip has one top folder: use what is inside it.
+          if [ "$(ls -A /tmp/x | wc -l)" = "1" ] && [ -d "/tmp/x/$(ls -A /tmp/x)" ]; then SRC="/tmp/x/$(ls -A /tmp/x)"; else SRC=/tmp/x; fi
+          cp -a "$SRC"/. .
+          rm -f site.zip
+          test -f gradlew && echo "Project found (gradlew is in place)" || echo "::warning::gradlew is not in the repo root after unpacking."
       - name: Commit
         run: |
           git config user.name "github-actions"
