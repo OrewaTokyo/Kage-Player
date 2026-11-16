@@ -1,0 +1,32 @@
+name: Inspect player
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Collect the player files into INSPECT2.txt
+        run: |
+          P=feature/player/src/main/java/dev/anilbeesetti/nextplayer/feature/player
+          show() { for f in "$@"; do if [ -f "$f" ]; then echo; echo "--- $f"; head -n 400 "$f"; fi; done; }
+          {
+            show $P/PlayerControls.kt $P/MediaPlayerControls.kt $P/MediaPlayerScreen.kt $P/PlayerViewModel.kt
+            show $P/ui/controls/ControlsTopView.kt $P/ui/controls/ControlsBottomView.kt $P/ui/controls/ControlsMiddleView.kt
+            show $P/ui/OverlayView.kt $P/ui/OverlayShowView.kt $P/ui/PlaybackSpeedSelectorView.kt
+            show $P/buttons/PlayerButton.kt $P/buttons/RepeatButton.kt $P/buttons/PlaybackSpeedButton.kt
+            show $P/state/MediaController.kt $P/state/PlaybackParametersState.kt $P/state/ControlsVisibilityState.kt
+            show $P/service/CustomCommands.kt
+            show feature/player/build.gradle.kts
+            echo; echo "--- player strings (names only)"; grep -ho 'name="[a-z_0-9]*"' feature/player/src/main/res/values/strings.xml 2>/dev/null | head -n 200
+          } > INSPECT2.txt 2>&1
+          wc -l INSPECT2.txt
+      - name: Commit
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add INSPECT2.txt
+          git commit -m "Add INSPECT2.txt" || echo "Nothing to commit"
+          git push
