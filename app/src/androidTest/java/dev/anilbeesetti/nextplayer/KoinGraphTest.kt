@@ -18,9 +18,6 @@ import dev.anilbeesetti.nextplayer.core.model.SearchHistory
 import dev.anilbeesetti.nextplayer.feature.more.screens.history.HistoryViewModel
 import dev.anilbeesetti.nextplayer.feature.more.screens.more.MoreViewModel
 import dev.anilbeesetti.nextplayer.feature.more.screens.trash.TrashViewModel
-import dev.anilbeesetti.nextplayer.feature.network.screens.addconnection.AddConnectionViewModel
-import dev.anilbeesetti.nextplayer.feature.network.screens.browse.NetworkBrowseViewModel
-import dev.anilbeesetti.nextplayer.feature.network.screens.list.NetworkViewModel
 import dev.anilbeesetti.nextplayer.feature.player.PlayerViewModel
 import dev.anilbeesetti.nextplayer.feature.playlist.screens.detail.PlaylistDetailViewModel
 import dev.anilbeesetti.nextplayer.feature.playlist.screens.list.PlaylistListViewModel
@@ -137,9 +134,7 @@ class KoinGraphTest {
                         playVideo = {},
                     ),
                 )
-                viewModel<NetworkViewModel>(
                     store = store,
-                    NetworkViewModel.Output(
                         addConnection = {},
                         editConnection = {},
                         openConnection = {},
@@ -147,18 +142,12 @@ class KoinGraphTest {
                         openStream = {},
                     ),
                 )
-                viewModel<AddConnectionViewModel>(
                     store = store,
-                    AddConnectionViewModel.Input(connectionId = null),
-                    AddConnectionViewModel.Output(navigateUp = {}),
                 )
-                viewModel<NetworkBrowseViewModel>(
                     store = store,
-                    NetworkBrowseViewModel.Input(
                         connectionId = -1,
                         path = "/",
                     ),
-                    NetworkBrowseViewModel.Output(
                         navigateUp = {},
                         playVideos = { _, _ -> },
                         openFolder = { _, _ -> },
