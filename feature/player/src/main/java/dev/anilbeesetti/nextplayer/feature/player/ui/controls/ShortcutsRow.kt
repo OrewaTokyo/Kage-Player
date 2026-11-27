@@ -23,6 +23,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
 import dev.anilbeesetti.nextplayer.core.model.PlayerShortcut
 import dev.anilbeesetti.nextplayer.core.model.VideoContentScale
