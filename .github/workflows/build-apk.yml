@@ -40,8 +40,47 @@ jobs:
           else
             echo "::warning::versionCode not found in a gradle file. The APK keeps the project's own version, so it may not install over the old one."
           fi
+      - name: Check the XML files are valid
+        run: |
+          python3 - <<'PY'
+          import pathlib, sys, xml.dom.minidom
+          bad = 0
+          for f in pathlib.Path('.').rglob('*.xml'):
+              if 'src' not in f.parts or 'build' in f.parts:
+                  continue
+              try:
+                  xml.dom.minidom.parse(str(f))
+              except Exception as e:
+                  bad += 1
+                  print(f"::error file={f}::Invalid XML: {e}")
+          sys.exit(1 if bad else 0)
+          PY
+      - name: Check the Kotlin code compiles (fast fail, shows the real error)
+        id: compile
+        shell: bash
+        run: |
+          chmod +x gradlew
+          ./gradlew compileReleaseKotlin --console=plain --warning-mode summary 2>&1 | tee "$RUNNER_TEMP/compile.log"
+      - name: Show what the compile error is
+        if: failure() && steps.compile.outcome == 'failure'
+        run: .github/scripts/summarize-build-errors.sh "$RUNNER_TEMP/compile.log" "Kotlin compile failed"
       - name: Build the release APK
-        run: chmod +x gradlew && ./gradlew assembleRelease --stacktrace
+        id: build
+        shell: bash
+        run: ./gradlew assembleRelease --console=plain --warning-mode summary 2>&1 | tee "$RUNNER_TEMP/build.log"
+      - name: Show what the build error is
+        if: failure() && steps.build.outcome == 'failure'
+        run: .github/scripts/summarize-build-errors.sh "$RUNNER_TEMP/build.log" "Release build failed"
+      - name: Keep the Gradle logs of a failed build
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-log
+          path: |
+            ${{ runner.temp }}/compile.log
+            ${{ runner.temp }}/build.log
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Align and sign with your secret key
         id: sign
         env:
