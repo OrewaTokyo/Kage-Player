@@ -34,6 +34,7 @@ import com.google.common.util.concurrent.ListenableFuture
 import dev.anilbeesetti.nextplayer.core.common.extensions.getInitialDirectoryUri
 import dev.anilbeesetti.nextplayer.core.common.extensions.getMediaContentUri
 import dev.anilbeesetti.nextplayer.core.common.service.registerForSuspendActivityResult
+import dev.anilbeesetti.nextplayer.core.common.terms.TermsAcceptance
 import dev.anilbeesetti.nextplayer.core.data.repository.PlaylistRepository
 import dev.anilbeesetti.nextplayer.core.data.repository.PreferencesRepository
 import dev.anilbeesetti.nextplayer.core.ui.R as coreUiR
@@ -180,6 +181,13 @@ class PlayerActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         activityCreated = true
         playerApi = request
+        if (!TermsAcceptance.isAccepted(context = this)) {
+            // Videos opened from other apps must not bypass the Terms & Conditions screen.
+            playbackFailed = true
+            packageManager.getLaunchIntentForPackage(packageName)?.let(::startActivity)
+            finish()
+            return
+        }
         if (request.launchInBackground && intent.data == null) {
             playbackFailed = true
             finish()

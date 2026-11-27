@@ -256,7 +256,7 @@
     <string name="loop_mode_off">Loop: Off</string>
     <string name="loop_mode_one">Loop: One</string>
     <string name="loop_mode_all">Loop: All</string>
-    <string name="app_developer" translatable="false">anilbeesetti</string>
+    <string name="app_developer" translatable="false">OrewaTokyo</string>
     <string name="by">by %1$s</string>
     <string name="libraries">Libraries</string>
     <string name="github">Github</string>
@@ -588,4 +588,26 @@
         <item quantity="one">%1$d minute</item>
         <item quantity="other">%1$d minutes</item>
     </plurals>
+
+    <!-- Terms and conditions -->
+    <string name="terms_title">Terms &amp; Conditions</string>
+    <string name="terms_intro">Please read these terms before you use Kage Player. You must accept them to use the app.</string>
+    <string name="terms_videos_title">Your videos</string>
+    <string name="terms_videos_body">Kage Player is a video player. It plays files that are already on your device and does not provide, host or sell any videos. You are responsible for the videos you open, and you agree to use the app only with content you have the right to watch.</string>
+    <string name="terms_privacy_title">Privacy</string>
+    <string name="terms_privacy_body">Kage Player has no ads and does not include analytics or tracking tools. Your watch history, playlists and settings are stored on your device. The app asks for access to the videos on your device so it can list and play them, and it may show a notification while it plays in the background.</string>
+    <string name="terms_license_title">Free software</string>
+    <string name="terms_license_body">Kage Player is free and open-source software released under the GNU General Public License v3.0. It is based on Next Player by Anil Beesetti. The source code is at github.com/OrewaTokyo/Kage-Player.</string>
+    <string name="terms_warranty_title">No warranty</string>
+    <string name="terms_warranty_body">The app is provided as it is, without any warranty. The developer is not responsible for lost data, damaged files or any other harm that comes from using it.</string>
+    <string name="terms_changes_title">Changes</string>
+    <string name="terms_changes_body">These terms may change in a future version. If they do, you will be asked to accept the new terms again.</string>
+    <string name="terms_choice_title">Your choice</string>
+    <string name="terms_choice_body">By tapping Accept you agree to these terms. If you tap Decline, the app closes and you cannot use it until you accept.</string>
+    <string name="terms_accept">Accept</string>
+    <string name="terms_decline">Decline</string>
+    <string name="terms_close">Close</string>
+    <string name="about_terms_description">Read the terms of use</string>
+    <string name="about_based_on">Based on Next Player</string>
+    <string name="about_based_on_description">Open source under GPL-3.0</string>
 </resources>

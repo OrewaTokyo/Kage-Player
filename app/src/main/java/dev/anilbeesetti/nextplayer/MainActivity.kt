@@ -63,6 +63,7 @@ import androidx.window.core.layout.WindowSizeClass
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import dev.anilbeesetti.nextplayer.core.common.extensions.isTelevision
 import dev.anilbeesetti.nextplayer.core.common.service.system.SystemService
+import dev.anilbeesetti.nextplayer.core.common.terms.TermsAcceptance
 import dev.anilbeesetti.nextplayer.core.media.services.MediaOperationsService
 import dev.anilbeesetti.nextplayer.core.model.ThemeConfig
 import dev.anilbeesetti.nextplayer.core.ui.components.LocalNavigationBottomPadding
@@ -83,6 +84,7 @@ import dev.anilbeesetti.nextplayer.navigation.openPlaylist
 import dev.anilbeesetti.nextplayer.navigation.playlistNavGraph
 import dev.anilbeesetti.nextplayer.navigation.rememberTopLevelNavState
 import dev.anilbeesetti.nextplayer.navigation.settingsNavGraph
+import dev.anilbeesetti.nextplayer.terms.TermsScreen
 import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.viewModel
 
@@ -95,6 +97,7 @@ class MainActivity : FragmentActivity() {
     private val viewModel: MainViewModel by viewModel()
 
     private var pendingPlaylistId by mutableStateOf<Long?>(value = null)
+    private var termsAccepted by mutableStateOf(value = false)
     private var darkSystemBars = false
 
     override fun onNewIntent(intent: Intent) {
@@ -106,6 +109,7 @@ class MainActivity : FragmentActivity() {
     @OptIn(ExperimentalPermissionsApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        termsAccepted = TermsAcceptance.isAccepted(context = this)
         if (savedInstanceState == null) {
             pendingPlaylistId = PlaylistShortcut.playlistId(intent = intent)
         }
@@ -155,107 +159,117 @@ class MainActivity : FragmentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.surfaceContainer,
                 ) {
-                    val navState = rememberTopLevelNavState()
-
-                    LaunchedEffect(key1 = pendingPlaylistId) {
-                        pendingPlaylistId?.let { playlistId ->
-                            navState.openPlaylist(playlistId = playlistId)
-                            pendingPlaylistId = null
-                        }
-                    }
-
-                    val mediaStack = navState.backStacks.getValue(TopLevelDestination.MEDIA.route)
-                    val playlistStack = navState.backStacks.getValue(
-                        TopLevelDestination.PLAYLISTS.route,
-                    )
-                    val moreStack = navState.backStacks.getValue(TopLevelDestination.MORE.route)
-
-                    val provider = entryProvider {
-                        mediaNavGraph(
-                            context = this@MainActivity,
-                            backStack = mediaStack,
+                    if (!termsAccepted) {
+                        TermsScreen(
+                            onAccept = {
+                                TermsAcceptance.accept(context = this@MainActivity)
+                                termsAccepted = true
+                            },
+                            onDecline = { finishAffinity() },
                         )
-                        playlistNavGraph(
-                            context = this@MainActivity,
-                            backStack = playlistStack,
-                        )
-                        moreNavGraph(
-                            context = this@MainActivity,
-                            backStack = moreStack,
-                        )
-                        settingsNavGraph(backStack = navState.currentStack)
-                    }
+                    } else {
+                        val navState = rememberTopLevelNavState()
 
-                    val topLevelFabStates =
-                        remember { mutableStateMapOf<String, TopLevelFabState>() }
-                    var showTopLevelBottomBar by remember { mutableStateOf(value = true) }
-                    NavigationLayout(
-                        state = navState,
-                        fabStates = topLevelFabStates,
-                        showBottomBar = showTopLevelBottomBar,
-                    ) { layoutPaddingValues ->
-                        val railPadding = layoutPaddingValues.calculateStartPadding(
-                            LocalLayoutDirection.current,
-                        )
-                        val navigationInsetsDecorator = remember(
-                            navState,
-                            railPadding,
-                        ) {
-                            NavEntryDecorator<NavKey> { entry ->
-                                // Reserve rail space per entry without resizing the animated display.
-                                Box(
-                                    navState.navigationTransitionModifier(entry).thenIf(
-                                        navState.topLevelContentKeys.contains(entry.contentKey),
-                                    ) {
-                                        padding(start = railPadding)
-                                            .consumeWindowInsets(
-                                                WindowInsets.displayCutout.only(
-                                                    WindowInsetsSides.Start,
-                                                ),
-                                            )
-                                    },
-                                ) { entry.Content() }
+                        LaunchedEffect(key1 = pendingPlaylistId) {
+                            pendingPlaylistId?.let { playlistId ->
+                                navState.openPlaylist(playlistId = playlistId)
+                                pendingPlaylistId = null
                             }
                         }
-                        CompositionLocalProvider(
-                            LocalNavigationBottomPadding provides
-                                layoutPaddingValues.calculateBottomPadding(),
-                            LocalTopLevelBottomBarVisibleSetter provides
-                                { showTopLevelBottomBar = it },
-                            LocalTopLevelFabSetter provides { key, state ->
-                                if (state == null) {
-                                    topLevelFabStates.remove(key = key)
-                                } else {
-                                    topLevelFabStates[key] = state
-                                }
-                            },
-                        ) {
-                            NavDisplay(
-                                entries = navState.rememberEntries(
-                                    entryProvider = provider,
-                                    entryDecorator = navigationInsetsDecorator,
-                                ),
-                                onBack = { navState.goBack() },
-                                transitionSpec = {
-                                    navState.navigationTransition(
-                                        initialState = initialState,
-                                        targetState = targetState,
-                                    )
-                                },
-                                popTransitionSpec = {
-                                    navState.navigationTransition(
-                                        initialState = initialState,
-                                        targetState = targetState,
-                                    )
-                                },
-                                predictivePopTransitionSpec = {
-                                    navState.navigationTransition(
-                                        initialState = initialState,
-                                        targetState = targetState,
-                                        isPredictive = true,
-                                    )
-                                },
+
+                        val mediaStack = navState.backStacks.getValue(TopLevelDestination.MEDIA.route)
+                        val playlistStack = navState.backStacks.getValue(
+                            TopLevelDestination.PLAYLISTS.route,
+                        )
+                        val moreStack = navState.backStacks.getValue(TopLevelDestination.MORE.route)
+
+                        val provider = entryProvider {
+                            mediaNavGraph(
+                                context = this@MainActivity,
+                                backStack = mediaStack,
                             )
+                            playlistNavGraph(
+                                context = this@MainActivity,
+                                backStack = playlistStack,
+                            )
+                            moreNavGraph(
+                                context = this@MainActivity,
+                                backStack = moreStack,
+                            )
+                            settingsNavGraph(backStack = navState.currentStack)
+                        }
+
+                        val topLevelFabStates =
+                            remember { mutableStateMapOf<String, TopLevelFabState>() }
+                        var showTopLevelBottomBar by remember { mutableStateOf(value = true) }
+                        NavigationLayout(
+                            state = navState,
+                            fabStates = topLevelFabStates,
+                            showBottomBar = showTopLevelBottomBar,
+                        ) { layoutPaddingValues ->
+                            val railPadding = layoutPaddingValues.calculateStartPadding(
+                                LocalLayoutDirection.current,
+                            )
+                            val navigationInsetsDecorator = remember(
+                                navState,
+                                railPadding,
+                            ) {
+                                NavEntryDecorator<NavKey> { entry ->
+                                    // Reserve rail space per entry without resizing the animated display.
+                                    Box(
+                                        navState.navigationTransitionModifier(entry).thenIf(
+                                            navState.topLevelContentKeys.contains(entry.contentKey),
+                                        ) {
+                                            padding(start = railPadding)
+                                                .consumeWindowInsets(
+                                                    WindowInsets.displayCutout.only(
+                                                        WindowInsetsSides.Start,
+                                                    ),
+                                                )
+                                        },
+                                    ) { entry.Content() }
+                                }
+                            }
+                            CompositionLocalProvider(
+                                LocalNavigationBottomPadding provides
+                                    layoutPaddingValues.calculateBottomPadding(),
+                                LocalTopLevelBottomBarVisibleSetter provides
+                                    { showTopLevelBottomBar = it },
+                                LocalTopLevelFabSetter provides { key, state ->
+                                    if (state == null) {
+                                        topLevelFabStates.remove(key = key)
+                                    } else {
+                                        topLevelFabStates[key] = state
+                                    }
+                                },
+                            ) {
+                                NavDisplay(
+                                    entries = navState.rememberEntries(
+                                        entryProvider = provider,
+                                        entryDecorator = navigationInsetsDecorator,
+                                    ),
+                                    onBack = { navState.goBack() },
+                                    transitionSpec = {
+                                        navState.navigationTransition(
+                                            initialState = initialState,
+                                            targetState = targetState,
+                                        )
+                                    },
+                                    popTransitionSpec = {
+                                        navState.navigationTransition(
+                                            initialState = initialState,
+                                            targetState = targetState,
+                                        )
+                                    },
+                                    predictivePopTransitionSpec = {
+                                        navState.navigationTransition(
+                                            initialState = initialState,
+                                            targetState = targetState,
+                                            isPredictive = true,
+                                        )
+                                    },
+                                )
+                            }
                         }
                     }
                     KageSplashOverlay()

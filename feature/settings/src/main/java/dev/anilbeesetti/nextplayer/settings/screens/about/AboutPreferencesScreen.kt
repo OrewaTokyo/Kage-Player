@@ -1,6 +1,5 @@
 package dev.anilbeesetti.nextplayer.settings.screens.about
 
-import android.content.ClipData
 import android.content.Context
 import android.widget.Toast
 import androidx.compose.animation.core.RepeatMode
@@ -23,6 +22,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -33,10 +33,12 @@ import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,8 +48,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.ClipEntry
-import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.UriHandler
@@ -60,19 +60,15 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.anilbeesetti.nextplayer.core.common.extensions.appIcon
 import dev.anilbeesetti.nextplayer.core.ui.R
 import dev.anilbeesetti.nextplayer.core.ui.components.ClickablePreferenceItem
-import dev.anilbeesetti.nextplayer.core.ui.components.ListSectionTitle
 import dev.anilbeesetti.nextplayer.core.ui.components.NextTopAppBar
+import dev.anilbeesetti.nextplayer.core.ui.components.TermsContent
 import dev.anilbeesetti.nextplayer.core.ui.components.rememberTvListFocusRequester
 import dev.anilbeesetti.nextplayer.core.ui.components.tvFocusDown
 import dev.anilbeesetti.nextplayer.core.ui.components.tvListFocus
 import dev.anilbeesetti.nextplayer.core.ui.designsystem.NextIcons
-import kotlinx.coroutines.launch
 
-private const val GITHUB_URL = "https://github.com/anilbeesetti/nextplayer"
-private const val GITHUB_SPONSORS_URL = "https://github.com/sponsors/anilbeesetti"
-private const val KOFI_URL = "https://ko-fi.com/anilbeesetti"
-private const val PAYPAL_URL = "https://paypal.me/AnilBeesetti"
-private const val UPI_ID = "anilbeesetti10@oksbi"
+private const val GITHUB_URL = "https://github.com/OrewaTokyo/Kage-Player"
+private const val NEXT_PLAYER_URL = "https://github.com/anilbeesetti/NextPlayer"
 
 @Composable
 fun AboutPreferencesScreen(viewModel: AboutPreferencesViewModel) {
@@ -94,8 +90,22 @@ private fun AboutPreferencesScreenContent(
 ) {
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
-    val clipboard = LocalClipboard.current
-    val scope = rememberCoroutineScope()
+    var showTerms by remember { mutableStateOf(value = false) }
+
+    if (showTerms) {
+        AlertDialog(
+            onDismissRequest = { showTerms = false },
+            title = { Text(text = stringResource(R.string.terms_title)) },
+            text = {
+                TermsContent(modifier = Modifier.verticalScroll(state = rememberScrollState()))
+            },
+            confirmButton = {
+                TextButton(onClick = { showTerms = false }) {
+                    Text(text = stringResource(R.string.terms_close))
+                }
+            },
+        )
+    }
 
     val listFocusRequester = rememberTvListFocusRequester()
     Scaffold(
@@ -138,73 +148,25 @@ private fun AboutPreferencesScreenContent(
                 },
                 onLibrariesClick = { onAction(AboutPreferencesAction.OpenLibraries) },
             )
-            ListSectionTitle(text = stringResource(id = R.string.donate))
             Column(
                 verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
             ) {
                 ClickablePreferenceItem(
-                    title = stringResource(R.string.github_sponsors),
-                    description = stringResource(
-                        R.string.support_the_developer_on,
-                        stringResource(R.string.github_sponsors),
-                    ),
-                    icon = ImageVector.vectorResource(R.drawable.ic_github),
-                    onClick = {
-                        uriHandler.openUriOrShowToast(
-                            uri = GITHUB_SPONSORS_URL,
-                            context = context,
-                        )
-                    },
+                    title = stringResource(R.string.terms_title),
+                    description = stringResource(R.string.about_terms_description),
+                    icon = NextIcons.Info,
+                    onClick = { showTerms = true },
                     isFirstItem = true,
                 )
                 ClickablePreferenceItem(
-                    title = stringResource(R.string.kofi),
-                    description = stringResource(
-                        R.string.support_the_developer_on,
-                        stringResource(R.string.kofi),
-                    ),
-                    icon = ImageVector.vectorResource(R.drawable.ic_kofi),
+                    title = stringResource(R.string.about_based_on),
+                    description = stringResource(R.string.about_based_on_description),
+                    icon = ImageVector.vectorResource(R.drawable.ic_github),
                     onClick = {
                         uriHandler.openUriOrShowToast(
-                            uri = KOFI_URL,
+                            uri = NEXT_PLAYER_URL,
                             context = context,
                         )
-                    },
-                )
-                ClickablePreferenceItem(
-                    title = stringResource(R.string.paypal),
-                    description = stringResource(
-                        R.string.support_the_developer_on,
-                        stringResource(R.string.paypal),
-                    ),
-                    icon = ImageVector.vectorResource(R.drawable.ic_paypal),
-                    onClick = {
-                        uriHandler.openUriOrShowToast(
-                            uri = PAYPAL_URL,
-                            context = context,
-                        )
-                    },
-                )
-                ClickablePreferenceItem(
-                    title = stringResource(R.string.upi),
-                    description = UPI_ID,
-                    icon = ImageVector.vectorResource(R.drawable.ic_upi),
-                    onClick = {
-                        scope.launch {
-                            clipboard.setClipEntry(
-                                clipEntry = ClipEntry(
-                                    ClipData.newPlainText(
-                                        "text",
-                                        UPI_ID,
-                                    ),
-                                ),
-                            )
-                            Toast.makeText(
-                                context,
-                                "copied to clipboard",
-                                Toast.LENGTH_SHORT,
-                            ).show()
-                        }
                     },
                     isLastItem = true,
                 )
