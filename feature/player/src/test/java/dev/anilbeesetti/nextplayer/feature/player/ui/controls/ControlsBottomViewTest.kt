@@ -2,7 +2,6 @@ package dev.anilbeesetti.nextplayer.feature.player.ui.controls
 
 import android.os.Looper
 import androidx.activity.ComponentActivity
-import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -25,7 +24,6 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.requestFocus
-import androidx.compose.ui.unit.dp
 import androidx.media3.common.C
 import androidx.media3.common.Format
 import androidx.media3.common.Label
@@ -122,7 +120,7 @@ class ControlsBottomViewTest {
 
     @Test
     @Config(qualifiers = "w600dp-h800dp-port")
-    fun upFromSeekbarEntersTimeThenRightVisitsChaptersAndSpeed() {
+    fun upFromSeekbarEntersTimeThenRightVisitsChapters() {
         val player = composeRule.runOnIdle { TestPlayer() }
         try {
             showControls(player = player)
@@ -138,9 +136,6 @@ class ControlsBottomViewTest {
                 .performKeyInput { pressKey(Key.DirectionRight) }
             composeRule.onNodeWithText(text = "Opening")
                 .assertIsFocused()
-                .performKeyInput { pressKey(Key.DirectionRight) }
-            composeRule.onNodeWithText(text = "1.0")
-                .assertIsFocused()
                 .performKeyInput { pressKey(Key.DirectionDown) }
             seekbar.assertIsFocused().performKeyInput { pressKey(Key.DirectionUp) }
             composeRule.onNodeWithText(text = "-01:00 / 01:00").assertIsFocused()
@@ -152,62 +147,13 @@ class ControlsBottomViewTest {
     @Test
     @Config(qualifiers = "w360dp-h800dp-port")
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
-    fun longVideoMovesSpeedAndRotateBelowSeekbarOnNarrowPlayer() {
-        assertControlRows(compact = true)
-    }
-
-    @Test
-    @Config(qualifiers = "w600dp-h800dp-port")
-    @GraphicsMode(GraphicsMode.Mode.NATIVE)
-    fun widePlayerKeepsSpeedAndRotateAboveSeekbar() {
-        assertControlRows(compact = false)
-    }
-
-    @Test
-    @Config(qualifiers = "w800dp-h800dp-land")
-    @GraphicsMode(GraphicsMode.Mode.NATIVE)
-    fun narrowPlayerInWideWindowMovesSpeedAndRotateBelowSeekbar() {
-        assertControlRows(
-            compact = true,
-            modifier = Modifier.width(360.dp),
-        )
-    }
-
-    private fun assertControlRows(compact: Boolean, modifier: Modifier = Modifier) {
-        val longTitle = "[SponsorBlock]: Cinematic - Rooftop cigars and a very long chapter title"
-        val player = composeRule.runOnIdle {
-            TestPlayer(
-                firstChapterTitle = longTitle,
-                durationMs = 10_800_000,
-            )
-        }
+    fun speedAndRotateLiveInTheShortcutsRowBelowTheSeekbar() {
+        val player = composeRule.runOnIdle { TestPlayer() }
         try {
-            showControls(
-                player = player,
-                modifier = modifier,
-            )
-            composeRule.onNodeWithText(text = "00:00 / 3:00:00").performTouchInput { click() }
-            composeRule.onNodeWithText(text = "-3:00:00 / 3:00:00").assertIsDisplayed()
-            val chapter = composeRule.onNodeWithText(text = longTitle).assertIsDisplayed()
+            showControls(player = player)
             val seekbarBounds = composeRule.onNode(
                 SemanticsMatcher.keyIsDefined(SemanticsProperties.ProgressBarRangeInfo),
             ).fetchSemanticsNode().boundsInRoot
-            if (compact) {
-                composeRule.onNodeWithContentDescription(
-                    composeRule.activity.getString(R.string.screen_rotation),
-                ).performScrollTo()
-                val shuffle = composeRule.onNodeWithContentDescription(
-                    composeRule.activity.getString(R.string.shuffle_off),
-                ).fetchSemanticsNode().boundsInRoot
-                val speed = composeRule.onNodeWithContentDescription(
-                    composeRule.activity.getString(R.string.select_playback_speed),
-                ).fetchSemanticsNode().boundsInRoot
-                val rotation = composeRule.onNodeWithContentDescription(
-                    composeRule.activity.getString(R.string.screen_rotation),
-                ).fetchSemanticsNode().boundsInRoot
-                assertTrue(speed.left >= shuffle.right)
-                assertTrue(rotation.left >= speed.right)
-            }
             listOf(
                 R.string.select_playback_speed,
                 R.string.screen_rotation,
@@ -215,27 +161,46 @@ class ControlsBottomViewTest {
                 val description = composeRule.activity.getString(resource)
                 composeRule.onAllNodesWithContentDescription(description).assertCountEquals(1)
                 val bounds = composeRule.onNodeWithContentDescription(description)
-                    .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+                    .performScrollTo().fetchSemanticsNode().boundsInRoot
                 assertTrue(
-                    "Control must be ${if (compact) "below" else "above"} the seekbar",
-                    if (compact) {
-                        bounds.top >= seekbarBounds.bottom
-                    } else {
-                        bounds.bottom <=
-                            seekbarBounds.top
-                    },
+                    "Control must be below the seekbar",
+                    bounds.top >= seekbarBounds.bottom,
                 )
-            }
-            if (compact) {
-                val minimumChapterWidth = with(composeRule.density) { 100.dp.toPx() }
-                assertTrue(chapter.fetchSemanticsNode().boundsInRoot.width >= minimumChapterWidth)
             }
         } finally {
             composeRule.runOnIdle { player.release() }
         }
     }
 
-    private fun showControls(player: Player, modifier: Modifier = Modifier) {
+    @Test
+    @Config(qualifiers = "w360dp-h800dp-port")
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun turningShortcutsOffLeavesOnlyTheCustomiseButton() {
+        val player = composeRule.runOnIdle { TestPlayer() }
+        try {
+            showControls(player = player, shortcutsVisible = false)
+            listOf(
+                R.string.select_playback_speed,
+                R.string.screen_rotation,
+                R.string.shuffle_off,
+            ).forEach { resource ->
+                composeRule.onAllNodesWithContentDescription(
+                    composeRule.activity.getString(resource),
+                ).assertCountEquals(0)
+            }
+            composeRule.onNodeWithContentDescription(
+                composeRule.activity.getString(R.string.shortcuts),
+            ).assertIsDisplayed()
+        } finally {
+            composeRule.runOnIdle { player.release() }
+        }
+    }
+
+    private fun showControls(
+        player: Player,
+        modifier: Modifier = Modifier,
+        shortcutsVisible: Boolean = true,
+    ) {
         composeRule.setContent {
             NextPlayerTheme {
                 val progress = rememberProgressStateWithTickInterval(player = player)
@@ -262,6 +227,7 @@ class ControlsBottomViewTest {
                     onPlayInBackgroundClick = {},
                     onSeek = player::seekTo,
                     onSeekEnd = {},
+                    shortcutsVisible = shortcutsVisible,
                 )
             }
         }

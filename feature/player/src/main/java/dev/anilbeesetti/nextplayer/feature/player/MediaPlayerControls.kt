@@ -1,5 +1,9 @@
 package dev.anilbeesetti.nextplayer.feature.player
 
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.media.audiofx.AudioEffect
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.annotation.OptIn
 import androidx.compose.foundation.focusable
@@ -28,9 +32,12 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.compose.state.rememberProgressStateWithTickInterval
 import dev.anilbeesetti.nextplayer.core.common.extensions.isTelevision
+import dev.anilbeesetti.nextplayer.core.ui.R
 import dev.anilbeesetti.nextplayer.core.ui.components.requestFocusUntilLanded
 import dev.anilbeesetti.nextplayer.core.ui.components.thenIf
 import dev.anilbeesetti.nextplayer.feature.player.state.ControlsVisibilityState
+import dev.anilbeesetti.nextplayer.feature.player.state.PlayerEffectsHandler
+import dev.anilbeesetti.nextplayer.feature.player.state.PlayerEffectsState
 import dev.anilbeesetti.nextplayer.feature.player.state.SeekGestureState
 import dev.anilbeesetti.nextplayer.feature.player.state.TapGestureState
 import dev.anilbeesetti.nextplayer.feature.player.state.VideoZoomAndContentScaleState
@@ -57,6 +64,7 @@ internal fun MediaPlayerControls(
     videoZoomAndContentScaleState: VideoZoomAndContentScaleState,
     isPipSupported: Boolean,
     onPictureInPictureClick: () -> Unit,
+    effects: PlayerEffectsState,
     modifier: Modifier = Modifier,
     dpadUpDown: Int? = null,
 ) {
@@ -86,6 +94,20 @@ internal fun MediaPlayerControls(
 
     val context = LocalContext.current
     val isTv = remember { context.isTelevision }
+    PlayerEffectsHandler(player = player, state = effects, mediaId = metadataState.mediaId)
+
+    fun openAudioEffects() {
+        val intent = Intent(AudioEffect.ACTION_DISPLAY_AUDIO_EFFECT_CONTROL_PANEL).apply {
+            putExtra(AudioEffect.EXTRA_AUDIO_SESSION, 0)
+            putExtra(AudioEffect.EXTRA_CONTENT_TYPE, AudioEffect.CONTENT_TYPE_MOVIE)
+        }
+        try {
+            context.startActivity(intent)
+        } catch (_: ActivityNotFoundException) {
+            Toast.makeText(context, R.string.audio_effect_unavailable, Toast.LENGTH_SHORT).show()
+        }
+    }
+
     val handleDpadKeys = isTv || dpadUpDown != null
     val rootFocusRequester = remember { FocusRequester() }
     val middleControlsFocusRequester = remember { FocusRequester() }
@@ -174,6 +196,9 @@ internal fun MediaPlayerControls(
                     onPlayInBackgroundClick = { onAction(PlayerAction.PlayInBackground) },
                     onToggleTimeDisplay = { onAction(PlayerAction.ToggleTimeDisplay) },
                     onPictureInPictureClick = onPictureInPictureClick,
+                    effects = effects,
+                    onAudioEffectClick = ::openAudioEffects,
+                    onAbRepeatClick = { effects.cycleAbRepeat(player.currentPosition) },
                     middleControlsModifier = Modifier.thenIf(condition = isTv) {
                         focusRequester(focusRequester = middleControlsFocusRequester)
                             .onFocusChanged { isMiddleControlsFocused = it.hasFocus }
@@ -210,6 +235,16 @@ internal fun MediaPlayerControls(
                 },
                 onVideoContentScaleChanged =
                     videoZoomAndContentScaleState::onVideoContentScaleChanged,
+                shortcutsVisible = playerPreferences.showShortcuts,
+                enabledShortcuts = playerPreferences.enabledShortcuts,
+                onShortcutsVisibleChange = { onAction(PlayerAction.SetShortcutsVisible(it)) },
+                onShortcutEnabledChange = { shortcut, enabled ->
+                    onAction(PlayerAction.SetShortcutEnabled(shortcut, enabled))
+                },
+                sleepTimerMinutes = effects.sleepTimerMinutes,
+                onSleepTimerSelected = { minutes ->
+                    if (minutes == null) effects.cancelSleepTimer() else effects.startSleepTimer(minutes)
+                },
             )
         }
     }

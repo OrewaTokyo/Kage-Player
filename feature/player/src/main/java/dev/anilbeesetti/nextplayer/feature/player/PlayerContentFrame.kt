@@ -24,11 +24,14 @@ import androidx.media3.ui.compose.state.rememberPresentationState
 import dev.anilbeesetti.nextplayer.feature.player.extensions.toContentScale
 import dev.anilbeesetti.nextplayer.feature.player.state.CuesState
 import dev.anilbeesetti.nextplayer.feature.player.state.PictureInPictureState
+import dev.anilbeesetti.nextplayer.feature.player.state.PlayerEffectsState
 import dev.anilbeesetti.nextplayer.feature.player.state.SubtitlePositionState
 import dev.anilbeesetti.nextplayer.feature.player.state.VideoZoomAndContentScaleState
 import dev.anilbeesetti.nextplayer.feature.player.ui.ShutterView
 import dev.anilbeesetti.nextplayer.feature.player.ui.SubtitleConfiguration
 import dev.anilbeesetti.nextplayer.feature.player.ui.SubtitleView
+
+private const val NIGHT_MODE_DIM_ALPHA = 0.45f
 
 @OptIn(UnstableApi::class)
 @Composable
@@ -37,6 +40,7 @@ fun PlayerContentFrame(
     player: Player,
     pictureInPictureState: PictureInPictureState,
     videoZoomAndContentScaleState: VideoZoomAndContentScaleState,
+    effectsState: PlayerEffectsState = PlayerEffectsState(),
     subtitleConfiguration: SubtitleConfiguration,
     cuesState: CuesState,
     subtitlePositionState: SubtitlePositionState,
@@ -44,7 +48,7 @@ fun PlayerContentFrame(
     displayAspectRatio: Float? = null,
 ) {
     val presentationState = rememberPresentationState(player = player)
-    val videoModifier = Modifier
+    val sizedVideoModifier = Modifier
         .resizeWithContentScale(
             contentScale = videoZoomAndContentScaleState.videoContentScale
                 .toContentScale(),
@@ -61,9 +65,20 @@ fun PlayerContentFrame(
                 )
             },
         )
+    // Subtitle bitmaps follow zoom and pan, but are never mirrored or flipped.
+    val bitmapModifier = sizedVideoModifier
         .graphicsLayer {
             scaleX = videoZoomAndContentScaleState.zoom
             scaleY = videoZoomAndContentScaleState.zoom
+            translationX = videoZoomAndContentScaleState.offset.x
+            translationY = videoZoomAndContentScaleState.offset.y
+        }
+    val videoModifier = sizedVideoModifier
+        .graphicsLayer {
+            val mirror = if (effectsState.isMirrored) -1f else 1f
+            val flip = if (effectsState.isFlipped) -1f else 1f
+            scaleX = videoZoomAndContentScaleState.zoom * mirror
+            scaleY = videoZoomAndContentScaleState.zoom * flip
             translationX = videoZoomAndContentScaleState.offset.x
             translationY = videoZoomAndContentScaleState.offset.y
         }
@@ -98,8 +113,15 @@ fun PlayerContentFrame(
                     .background(Color.Black.copy(alpha = 0.3f)),
             )
         }
+        if (effectsState.isNightMode) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = NIGHT_MODE_DIM_ALPHA)),
+            )
+        }
         SubtitleView(
-            bitmapModifier = videoModifier,
+            bitmapModifier = bitmapModifier,
             cuesState = cuesState,
             positionState = subtitlePositionState,
             isInPictureInPictureMode = pictureInPictureState.isInPictureInPictureMode,

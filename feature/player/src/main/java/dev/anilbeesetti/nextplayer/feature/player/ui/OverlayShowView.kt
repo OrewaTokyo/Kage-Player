@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.media3.common.Player
 import androidx.media3.extractor.metadata.Chapter
+import dev.anilbeesetti.nextplayer.core.model.PlayerShortcut
 import dev.anilbeesetti.nextplayer.core.model.VideoContentScale
 import dev.anilbeesetti.nextplayer.feature.player.extensions.noRippleClickable
 import dev.anilbeesetti.nextplayer.feature.player.state.SubtitleOptionsEvent
@@ -29,6 +30,12 @@ fun BoxScope.OverlayShowView(
     onSelectAudioClick: () -> Unit = {},
     onSubtitleOptionEvent: (SubtitleOptionsEvent) -> Unit = {},
     onVideoContentScaleChanged: (VideoContentScale) -> Unit = {},
+    shortcutsVisible: Boolean = true,
+    enabledShortcuts: Set<PlayerShortcut> = PlayerShortcut.defaults,
+    onShortcutsVisibleChange: (Boolean) -> Unit = {},
+    onShortcutEnabledChange: (PlayerShortcut, Boolean) -> Unit = { _, _ -> },
+    sleepTimerMinutes: Int? = null,
+    onSleepTimerSelected: (Int?) -> Unit = {},
 ) {
     Box(
         modifier = Modifier
@@ -88,6 +95,23 @@ fun BoxScope.OverlayShowView(
         currentChapterIndex = currentChapterIndex,
         onChapterSelected = onChapterSelected,
     )
+
+    ShortcutsSelectorView(
+        show = overlayView == OverlayView.SHORTCUTS,
+        shortcutsVisible = shortcutsVisible,
+        enabledShortcuts = enabledShortcuts,
+        onShortcutsVisibleChange = onShortcutsVisibleChange,
+        onShortcutEnabledChange = onShortcutEnabledChange,
+    )
+
+    SleepTimerSelectorView(
+        show = overlayView == OverlayView.SLEEP_TIMER,
+        selectedMinutes = sleepTimerMinutes,
+        onTimerSelected = {
+            onSleepTimerSelected(it)
+            onDismiss()
+        },
+    )
 }
 
 val Configuration.isPortrait: Boolean
@@ -101,4 +125,6 @@ enum class OverlayView {
     VIDEO_CONTENT_SCALE,
     PLAYLIST,
     CHAPTERS,
+    SHORTCUTS,
+    SLEEP_TIMER,
 }

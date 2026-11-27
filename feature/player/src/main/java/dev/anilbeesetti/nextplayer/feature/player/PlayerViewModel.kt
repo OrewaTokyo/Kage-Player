@@ -8,6 +8,7 @@ import dev.anilbeesetti.nextplayer.core.data.repository.PreferencesRepository
 import dev.anilbeesetti.nextplayer.core.domain.GetSortedPlaylistUseCase
 import dev.anilbeesetti.nextplayer.core.model.LoopMode
 import dev.anilbeesetti.nextplayer.core.model.PlayerPreferences
+import dev.anilbeesetti.nextplayer.core.model.PlayerShortcut
 import dev.anilbeesetti.nextplayer.core.model.Video
 import dev.anilbeesetti.nextplayer.core.model.VideoContentScale
 import dev.anilbeesetti.nextplayer.core.ui.base.MviViewModel
@@ -88,6 +89,10 @@ class PlayerViewModel(
 
             is PlayerAction.ToggleTimeDisplay -> toggleTimeDisplay()
 
+            is PlayerAction.SetShortcutsVisible -> setShortcutsVisible(action.visible)
+
+            is PlayerAction.SetShortcutEnabled -> setShortcutEnabled(action.shortcut, action.enabled)
+
             is PlayerAction.OnVideoZoomEvent -> onVideoZoomEvent(action.event)
 
             is PlayerAction.OnSubtitleOptionEvent -> onSubtitleOptionEvent(action.event)
@@ -128,6 +133,26 @@ class PlayerViewModel(
     private fun setLoopMode(loopMode: LoopMode) {
         viewModelScope.launch {
             preferencesRepository.updatePlayerPreferences { it.copy(loopMode = loopMode) }
+        }
+    }
+
+    private fun setShortcutsVisible(visible: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.updatePlayerPreferences { it.copy(showShortcuts = visible) }
+        }
+    }
+
+    private fun setShortcutEnabled(shortcut: PlayerShortcut, enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.updatePlayerPreferences {
+                it.copy(
+                    enabledShortcuts = if (enabled) {
+                        it.enabledShortcuts + shortcut
+                    } else {
+                        it.enabledShortcuts - shortcut
+                    },
+                )
+            }
         }
     }
 
@@ -212,6 +237,8 @@ sealed interface PlayerAction {
     data class UpdateSubtitleOffset(val y: Float) : PlayerAction
     data class SetLoopMode(val loopMode: LoopMode) : PlayerAction
     data object ToggleTimeDisplay : PlayerAction
+    data class SetShortcutsVisible(val visible: Boolean) : PlayerAction
+    data class SetShortcutEnabled(val shortcut: PlayerShortcut, val enabled: Boolean) : PlayerAction
     data class OnVideoZoomEvent(val event: VideoZoomEvent) : PlayerAction
     data class OnSubtitleOptionEvent(val event: SubtitleOptionsEvent) : PlayerAction
 }

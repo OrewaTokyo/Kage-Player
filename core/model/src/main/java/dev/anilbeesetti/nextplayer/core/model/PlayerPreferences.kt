@@ -44,6 +44,10 @@ data class PlayerPreferences(
     val useMaterialYouControls: Boolean = false,
     val showRemainingTime: Boolean = false,
 
+    // Shortcuts (the button row under the seekbar)
+    val showShortcuts: Boolean = true,
+    val enabledShortcuts: Set<PlayerShortcut> = PlayerShortcut.defaults,
+
     // Audio Preferences
     val preferredAudioLanguage: String = "",
     val pauseOnHeadsetDisconnect: Boolean = true,

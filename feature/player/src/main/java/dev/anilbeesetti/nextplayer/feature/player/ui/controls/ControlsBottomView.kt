@@ -2,7 +2,6 @@ package dev.anilbeesetti.nextplayer.feature.player.ui.controls
 
 import androidx.annotation.OptIn
 import androidx.compose.foundation.focusGroup
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -11,12 +10,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.displayCutout
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.union
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.NavigateNext
 import androidx.compose.material3.Icon
@@ -33,7 +30,6 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -45,19 +41,17 @@ import androidx.media3.common.util.Util.getStringForTime
 import androidx.media3.ui.compose.state.ProgressStateWithTickInterval
 import androidx.media3.ui.compose.state.rememberProgressStateWithTickInterval
 import dev.anilbeesetti.nextplayer.core.common.extensions.isTelevision
+import dev.anilbeesetti.nextplayer.core.model.PlayerShortcut
 import dev.anilbeesetti.nextplayer.core.model.VideoContentScale
 import dev.anilbeesetti.nextplayer.core.ui.R
 import dev.anilbeesetti.nextplayer.core.ui.extensions.copy
 import dev.anilbeesetti.nextplayer.core.ui.theme.NextPlayerTheme
-import dev.anilbeesetti.nextplayer.feature.player.buttons.LoopButton
-import dev.anilbeesetti.nextplayer.feature.player.buttons.PlaybackSpeedButton
 import dev.anilbeesetti.nextplayer.feature.player.buttons.PlayerButton
 import dev.anilbeesetti.nextplayer.feature.player.buttons.PlayerButtonBlackAlpha
-import dev.anilbeesetti.nextplayer.feature.player.buttons.RotateButton
-import dev.anilbeesetti.nextplayer.feature.player.buttons.ShuffleButton
-import dev.anilbeesetti.nextplayer.feature.player.extensions.drawableRes
 import dev.anilbeesetti.nextplayer.feature.player.state.ChaptersState
+import dev.anilbeesetti.nextplayer.feature.player.state.PlayerEffectsState
 import dev.anilbeesetti.nextplayer.feature.player.state.rememberChaptersState
+import dev.anilbeesetti.nextplayer.feature.player.state.rememberPlayerEffectsState
 import dev.anilbeesetti.nextplayer.feature.player.ui.preview.rememberPreviewPlayer
 import dev.anilbeesetti.nextplayer.feature.player.ui.titleOrDefault
 
@@ -84,6 +78,13 @@ fun ControlsBottomView(
     onPlayInBackgroundClick: () -> Unit,
     onSeek: (Long) -> Unit,
     onSeekEnd: () -> Unit,
+    shortcutsVisible: Boolean = true,
+    enabledShortcuts: Set<PlayerShortcut> = PlayerShortcut.defaults,
+    effects: PlayerEffectsState = rememberPlayerEffectsState(),
+    onAudioEffectClick: () -> Unit = {},
+    onSleepTimerClick: () -> Unit = {},
+    onAbRepeatClick: () -> Unit = {},
+    onCustomiseShortcutsClick: () -> Unit = {},
 ) {
     val systemBarsPadding = WindowInsets.systemBars.union(
         WindowInsets.displayCutout,
@@ -92,7 +93,6 @@ fun ControlsBottomView(
     val isTv = remember { context.isTelevision }
     val timeButtonFocusRequester = remember { FocusRequester() }
     BoxWithConstraints(modifier = modifier) {
-        val useCompactControls = maxWidth < 600.dp && !isTv
         Column(
             modifier = Modifier
                 .padding(systemBarsPadding.copy(top = 0.dp))
@@ -197,22 +197,6 @@ fun ControlsBottomView(
                         }
                     }
                 }
-
-                if (!useCompactControls) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        PlaybackSpeedButton(
-                            player = player,
-                            onClick = onPlaybackSpeedClick,
-                        )
-
-                        if (!isTv) {
-                            RotateButton()
-                        }
-                    }
-                }
             }
             PlayerSeekbar(
                 position = progressState.currentPositionMs.toFloat(),
@@ -221,55 +205,26 @@ fun ControlsBottomView(
                 onSeek = { onSeek(it.toLong()) },
                 onSeekFinished = { onSeekEnd() },
             )
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(state = rememberScrollState()),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(
-                    8.dp,
-                    alignment = controlsAlignment,
-                ),
-            ) {
-                PlayerButton(onClick = onLockControlsClick) {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_lock_open),
-                        contentDescription = null,
-                    )
-                }
-                PlayerButton(
-                    onClick = onVideoContentScaleClick,
-                    onLongClick = onVideoContentScaleLongClick,
-                ) {
-                    Icon(
-                        painter = painterResource(videoContentScale.drawableRes()),
-                        contentDescription = null,
-                    )
-                }
-                if (isPipSupported) {
-                    PlayerButton(onClick = onPictureInPictureClick) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_pip),
-                            contentDescription = null,
-                        )
-                    }
-                }
-                PlayerButton(onClick = onPlayInBackgroundClick) {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_headset),
-                        contentDescription = null,
-                    )
-                }
-                LoopButton(player = player)
-                ShuffleButton(player = player)
-                if (useCompactControls) {
-                    PlaybackSpeedButton(
-                        player = player,
-                        onClick = onPlaybackSpeedClick,
-                    )
-                    RotateButton()
-                }
-            }
+            ShortcutsRow(
+                player = player,
+                shortcutsVisible = shortcutsVisible,
+                enabledShortcuts = enabledShortcuts,
+                effects = effects,
+                controlsAlignment = controlsAlignment,
+                videoContentScale = videoContentScale,
+                isPipSupported = isPipSupported,
+                isTv = isTv,
+                onLockClick = onLockControlsClick,
+                onVideoContentScaleClick = onVideoContentScaleClick,
+                onVideoContentScaleLongClick = onVideoContentScaleLongClick,
+                onPictureInPictureClick = onPictureInPictureClick,
+                onPlayInBackgroundClick = onPlayInBackgroundClick,
+                onPlaybackSpeedClick = onPlaybackSpeedClick,
+                onAudioEffectClick = onAudioEffectClick,
+                onSleepTimerClick = onSleepTimerClick,
+                onAbRepeatClick = onAbRepeatClick,
+                onCustomiseClick = onCustomiseShortcutsClick,
+            )
         }
     }
 }

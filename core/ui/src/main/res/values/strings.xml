@@ -563,4 +563,29 @@
         <item quantity="one">%1$d day</item>
         <item quantity="other">%1$d days</item>
     </plurals>
+
+    <!-- Player shortcuts -->
+    <string name="shortcuts">Shortcuts</string>
+    <string name="show_shortcuts">Show shortcuts</string>
+    <string name="shortcut_lock">Lock</string>
+    <string name="shortcut_screen_scale">Screen scale</string>
+    <string name="shortcut_pip">Picture in picture</string>
+    <string name="shortcut_screen_rotation">Screen rotation</string>
+    <string name="shortcut_background_play">Background play</string>
+    <string name="shortcut_playback_speed">Playback speed</string>
+    <string name="shortcut_loop">Loop</string>
+    <string name="shortcut_shuffle">Shuffle</string>
+    <string name="shortcut_mute">Mute</string>
+    <string name="shortcut_audio_effect">Audio effect</string>
+    <string name="shortcut_sleep_timer">Sleep timer</string>
+    <string name="shortcut_ab_repeat">A - B Repeat</string>
+    <string name="shortcut_night_mode">Night mode</string>
+    <string name="shortcut_mirror_mode">Mirror mode</string>
+    <string name="shortcut_vertical_flip">Vertical flip</string>
+    <string name="sleep_timer_off">Off</string>
+    <string name="audio_effect_unavailable">No audio effect panel found on this device</string>
+    <plurals name="sleep_timer_minutes">
+        <item quantity="one">%1$d minute</item>
+        <item quantity="other">%1$d minutes</item>
+    </plurals>
 </resources>

@@ -33,6 +33,7 @@ import dev.anilbeesetti.nextplayer.feature.player.state.rememberControlsVisibili
 import dev.anilbeesetti.nextplayer.feature.player.state.rememberCuesState
 import dev.anilbeesetti.nextplayer.feature.player.state.rememberErrorState
 import dev.anilbeesetti.nextplayer.feature.player.state.rememberPictureInPictureState
+import dev.anilbeesetti.nextplayer.feature.player.state.rememberPlayerEffectsState
 import dev.anilbeesetti.nextplayer.feature.player.state.rememberSeekGestureState
 import dev.anilbeesetti.nextplayer.feature.player.state.rememberSubtitlePositionState
 import dev.anilbeesetti.nextplayer.feature.player.state.rememberTapGestureState
@@ -139,6 +140,7 @@ internal fun MediaPlayerContent(
         )
     }
     val errorState = rememberErrorState(player = player)
+    val effectsState = rememberPlayerEffectsState()
     val cuesState = rememberCuesState(player = player)
     val subtitlePositionState = rememberSubtitlePositionState(
         savedOffsetY = playerPreferences.subtitleOffsetY,
@@ -184,6 +186,7 @@ internal fun MediaPlayerContent(
                 player = player,
                 pictureInPictureState = pictureInPictureState,
                 videoZoomAndContentScaleState = videoZoomAndContentScaleState,
+                effectsState = effectsState,
                 videoVisible = api?.videoVisible ?: true,
                 displayAspectRatio = api?.displayAspectRatio,
                 cuesState = cuesState,
@@ -222,6 +225,7 @@ internal fun MediaPlayerContent(
             tapGestureState = tapGestureState,
             seekGestureState = seekGestureState,
             videoZoomAndContentScaleState = videoZoomAndContentScaleState,
+            effects = effectsState,
             dpadUpDown = api?.dpadUpDown,
             isPipSupported = pictureInPictureState?.isPipSupported == true,
             onPictureInPictureClick = {

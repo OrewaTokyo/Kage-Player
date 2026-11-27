@@ -62,6 +62,7 @@ import dev.anilbeesetti.nextplayer.feature.player.extensions.audioTrackIndex
 import dev.anilbeesetti.nextplayer.feature.player.extensions.copy
 import dev.anilbeesetti.nextplayer.feature.player.extensions.externalAudio
 import dev.anilbeesetti.nextplayer.feature.player.extensions.externalAudioIndex
+import dev.anilbeesetti.nextplayer.feature.player.extensions.autoSelectSubtitleTrack
 import dev.anilbeesetti.nextplayer.feature.player.extensions.getManuallySelectedTrackIndex
 import dev.anilbeesetti.nextplayer.feature.player.extensions.positionMs
 import dev.anilbeesetti.nextplayer.feature.player.extensions.setExtras
@@ -317,6 +318,12 @@ class PlayerService : MediaSessionService() {
                             trackIndex = trackIndex,
                         )
                     }
+                }
+                // Nothing remembered for this video: make sure a subtitle shows up.
+                if (!playerPreferences.rememberSelections ||
+                    player.mediaMetadata.subtitleTrackIndex == null
+                ) {
+                    player.autoSelectSubtitleTrack()
                 }
                 if (!playerPreferences.rememberSelections) return
                 mediaSession?.player?.mediaMetadata?.audioTrackIndex?.takeIf {
@@ -931,7 +938,8 @@ class PlayerService : MediaSessionService() {
                 buildUponParameters()
                     .setTunnelingEnabled(playerPreferences.enableTunneledPlayback)
                     .setPreferredAudioLanguage(playerPreferences.preferredAudioLanguage)
-                    .setPreferredTextLanguage(playerPreferences.preferredSubtitleLanguage),
+                    .setPreferredTextLanguage(playerPreferences.preferredSubtitleLanguage)
+                    .setSelectUndeterminedTextLanguage(true),
             )
         }
 

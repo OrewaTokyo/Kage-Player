@@ -20,8 +20,10 @@ import dev.anilbeesetti.nextplayer.core.model.PlayerPreferences
 import dev.anilbeesetti.nextplayer.feature.player.extensions.nameRes
 import dev.anilbeesetti.nextplayer.feature.player.state.ChaptersState
 import dev.anilbeesetti.nextplayer.feature.player.state.ControlsVisibilityState
+import dev.anilbeesetti.nextplayer.feature.player.state.PlayerEffectsState
 import dev.anilbeesetti.nextplayer.feature.player.state.SeekGestureState
 import dev.anilbeesetti.nextplayer.feature.player.state.VideoZoomAndContentScaleState
+import dev.anilbeesetti.nextplayer.feature.player.state.rememberPlayerEffectsState
 import dev.anilbeesetti.nextplayer.feature.player.state.seekAmountFormatted
 import dev.anilbeesetti.nextplayer.feature.player.state.seekToPositionFormated
 import dev.anilbeesetti.nextplayer.feature.player.ui.InfoView
@@ -51,6 +53,9 @@ fun PlayerControls(
     onPictureInPictureClick: () -> Unit,
     modifier: Modifier = Modifier,
     middleControlsModifier: Modifier = Modifier,
+    effects: PlayerEffectsState = rememberPlayerEffectsState(),
+    onAudioEffectClick: () -> Unit = {},
+    onAbRepeatClick: () -> Unit = {},
 ) {
     Box(
         modifier = modifier.fillMaxSize(),
@@ -109,6 +114,13 @@ fun PlayerControls(
                         onShowOverlay(OverlayView.VIDEO_CONTENT_SCALE)
                     },
                     onPictureInPictureClick = onPictureInPictureClick,
+                    shortcutsVisible = playerPreferences.showShortcuts,
+                    enabledShortcuts = playerPreferences.enabledShortcuts,
+                    effects = effects,
+                    onAudioEffectClick = onAudioEffectClick,
+                    onSleepTimerClick = { onShowOverlay(OverlayView.SLEEP_TIMER) },
+                    onAbRepeatClick = onAbRepeatClick,
+                    onCustomiseShortcutsClick = { onShowOverlay(OverlayView.SHORTCUTS) },
                 )
             }
         }

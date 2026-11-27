@@ -71,6 +71,52 @@ fun Player.switchTrack(trackType: @C.TrackType Int, trackIndex: Int) {
     }
 }
 
+/**
+ * Turns on a subtitle track when the player did not pick one itself.
+ *
+ * Media3 only auto-selects an embedded track that is flagged as default or that matches the
+ * preferred language. Many anime releases tag their tracks with neither, so no subtitle
+ * showed up at all. This picks the best remaining candidate instead: a track in the preferred
+ * language first, then English, then the default-flagged one. Forced tracks and
+ * "Signs & Songs" tracks are only used when nothing else exists.
+ *
+ * Nothing happens when the user switched subtitles off.
+ */
+@UnstableApi
+fun Player.autoSelectSubtitleTrack() {
+    if (trackSelectionParameters.disabledTrackTypes.contains(C.TRACK_TYPE_TEXT)) return
+
+    val textGroups = currentTracks.groups.filter { it.type == C.TRACK_TYPE_TEXT }
+    if (textGroups.any { it.isSelected }) return
+
+    val preferredLanguage = trackSelectionParameters.preferredTextLanguages
+        .firstOrNull()
+        .orEmpty()
+        .lowercase()
+
+    val bestIndex = textGroups
+        .withIndex()
+        .filter { (_, group) -> group.isSupported && group.length > 0 }
+        .maxByOrNull { (_, group) ->
+            val format = group.getTrackFormat(0)
+            val language = format.language.orEmpty().lowercase()
+            val title = format.label.orEmpty().lowercase()
+            var score = 0
+            if (preferredLanguage.isNotEmpty() && language.startsWith(preferredLanguage.take(2))) {
+                score += 8
+            }
+            if (language == "en" || language.startsWith("eng")) score += 4
+            if (format.selectionFlags and C.SELECTION_FLAG_DEFAULT != 0) score += 2
+            if (format.selectionFlags and C.SELECTION_FLAG_FORCED != 0) score -= 6
+            if ("sign" in title || "song" in title) score -= 3
+            score
+        }
+        ?.index
+        ?: return
+
+    switchTrack(C.TRACK_TYPE_TEXT, trackIndex = bestIndex)
+}
+
 @UnstableApi
 fun Player.getManuallySelectedTrackIndex(trackType: @C.TrackType Int): Int? {
     val isDisabled = trackSelectionParameters.disabledTrackTypes.contains(trackType)
