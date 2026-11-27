@@ -63,14 +63,14 @@ jobs:
           ./gradlew compileReleaseKotlin --console=plain --warning-mode summary 2>&1 | tee "$RUNNER_TEMP/compile.log"
       - name: Show what the compile error is
         if: failure() && steps.compile.outcome == 'failure'
-        run: .github/scripts/summarize-build-errors.sh "$RUNNER_TEMP/compile.log" "Kotlin compile failed"
+        run: bash .github/scripts/summarize-build-errors.sh "$RUNNER_TEMP/compile.log" "Kotlin compile failed"
       - name: Build the release APK
         id: build
         shell: bash
         run: ./gradlew assembleRelease --console=plain --warning-mode summary 2>&1 | tee "$RUNNER_TEMP/build.log"
       - name: Show what the build error is
         if: failure() && steps.build.outcome == 'failure'
-        run: .github/scripts/summarize-build-errors.sh "$RUNNER_TEMP/build.log" "Release build failed"
+        run: bash .github/scripts/summarize-build-errors.sh "$RUNNER_TEMP/build.log" "Release build failed"
       - name: Keep the Gradle logs of a failed build
         if: failure()
         uses: actions/upload-artifact@v4
