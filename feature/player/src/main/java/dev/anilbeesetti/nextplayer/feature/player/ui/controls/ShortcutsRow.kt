@@ -72,7 +72,7 @@ fun ShortcutsRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp, alignment = controlsAlignment),
     ) {
         if (shortcutsVisible) {
-            PlayerShortcut.entries.filter { it in enabledShortcuts }.forEach { shortcut ->
+            for (shortcut in PlayerShortcut.entries.filter { it in enabledShortcuts }) {
                 when (shortcut) {
                     PlayerShortcut.LOCK -> PlayerButton(onClick = onLockClick) {
                         Icon(
