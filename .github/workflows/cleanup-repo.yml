@@ -1,0 +1,27 @@
+name: Clean up leftover files
+# Run once by hand (Actions > Clean up leftover files > Run workflow).
+# It deletes files that nothing uses. It never touches .github, so the old one-off
+# workflows (brand, tidy, rename, inspect, inspect2, remove-network) must be deleted by hand in GitHub.
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Delete the leftover files
+        run: |
+          # nextplayer.jks   = a signing key file nothing uses (builds are signed with your secrets)
+          # INSPECT.txt, PROJECT_TREE.txt = output of the one-off inspect workflows
+          # Gemfile, renovate.json = upstream tooling this project does not use
+          for f in nextplayer.jks INSPECT.txt PROJECT_TREE.txt Gemfile renovate.json; do
+            if [ -e "$f" ]; then git rm -q "$f" && echo "Deleted $f"; else echo "Not found: $f"; fi
+          done
+      - name: Commit
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git commit -m "Remove leftover files" || echo "Nothing to commit"
+          git push
