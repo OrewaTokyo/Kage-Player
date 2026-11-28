@@ -193,6 +193,9 @@ fun ShortcutsRow(
                         )
                     }
 
+                    // Shown as its own button over the video, not in this row.
+                    PlayerShortcut.SKIP_INTRO -> Unit
+
                     PlayerShortcut.VERTICAL_FLIP -> PlayerButton(
                         onClick = { effects.isFlipped = !effects.isFlipped },
                     ) {

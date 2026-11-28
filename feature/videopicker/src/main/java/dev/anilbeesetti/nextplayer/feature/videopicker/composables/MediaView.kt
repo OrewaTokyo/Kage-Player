@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -45,6 +46,8 @@ import dev.anilbeesetti.nextplayer.feature.videopicker.state.SelectionManager
 import dev.anilbeesetti.nextplayer.feature.videopicker.state.rememberSelectionManager
 import kotlin.math.abs
 
+private const val FINISHED_FRACTION = 0.95f
+
 @OptIn(
     ExperimentalMaterial3Api::class,
     ExperimentalFoundationApi::class,
@@ -70,6 +73,17 @@ fun MediaView(
 
     val context = LocalContext.current
     val isTv = remember { context.isTelevision }
+    // Resume the last episode, or offer the next one once it has been finished.
+    val continueTarget: Pair<Video, Boolean>? = remember(recentlyPlayedVideo, mediaHolder.videos) {
+        recentlyPlayedVideo?.let { last ->
+            if ((last.playedPercentage ?: 0f) < FINISHED_FRACTION) {
+                last to false
+            } else {
+                val index = mediaHolder.videos.indexOfFirst { it.path == last.path }
+                if (index < 0) null else mediaHolder.videos.getOrNull(index + 1)?.let { it to true }
+            }
+        }
+    }
     val folderMinWidth = if (isTv) 160.dp else 90.dp
     val videoMinWidth = if (isTv) 240.dp else 130.dp
 
@@ -121,6 +135,21 @@ fun MediaView(
             verticalArrangement = Arrangement.spacedBy(space = itemSpacing),
             horizontalArrangement = Arrangement.spacedBy(space = itemSpacing),
         ) {
+            if (continueTarget != null && !selectionManager.isInSelectionMode) {
+                val (continueVideo, isUpNext) = continueTarget
+                item(
+                    key = "continue_watching",
+                    span = { GridItemSpan(currentLineSpan = maxLineSpan) },
+                ) {
+                    ContinueWatchingCard(
+                        video = continueVideo,
+                        isUpNext = isUpNext,
+                        preferences = preferences,
+                        modifier = Modifier.padding(bottom = 8.dp),
+                        onClick = { onVideoClick(continueVideo.uriString.toUri()) },
+                    )
+                }
+            }
             if (showHeaders && mediaHolder.folders.isNotEmpty()) {
                 item(span = { GridItemSpan(currentLineSpan = maxLineSpan) }) {
                     ListSectionTitle(

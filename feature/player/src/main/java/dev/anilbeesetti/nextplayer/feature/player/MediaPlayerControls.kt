@@ -9,6 +9,7 @@ import androidx.annotation.OptIn
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
@@ -32,6 +33,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.compose.state.rememberProgressStateWithTickInterval
 import dev.anilbeesetti.nextplayer.core.common.extensions.isTelevision
+import dev.anilbeesetti.nextplayer.core.model.PlayerShortcut
 import dev.anilbeesetti.nextplayer.core.ui.R
 import dev.anilbeesetti.nextplayer.core.ui.components.requestFocusUntilLanded
 import dev.anilbeesetti.nextplayer.core.ui.components.thenIf
@@ -49,6 +51,7 @@ import dev.anilbeesetti.nextplayer.feature.player.ui.DpadSeekIndicator
 import dev.anilbeesetti.nextplayer.feature.player.ui.OverlayShowView
 import dev.anilbeesetti.nextplayer.feature.player.ui.OverlayView
 import dev.anilbeesetti.nextplayer.feature.player.ui.PlayerGestureIndicators
+import dev.anilbeesetti.nextplayer.feature.player.ui.SkipIntroButton
 import kotlin.time.Duration.Companion.seconds
 
 /** Controls and overlays shared by live playback and the previewable content. */
@@ -203,6 +206,17 @@ internal fun MediaPlayerControls(
                         focusRequester(focusRequester = middleControlsFocusRequester)
                             .onFocusChanged { isMiddleControlsFocused = it.hasFocus }
                     },
+                )
+            }
+
+            if (PlayerShortcut.SKIP_INTRO in playerPreferences.enabledShortcuts &&
+                !controlsVisibilityState.controlsLocked
+            ) {
+                SkipIntroButton(
+                    player = player,
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(end = 24.dp),
                 )
             }
 

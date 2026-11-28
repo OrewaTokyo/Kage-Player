@@ -23,6 +23,7 @@ enum class PlayerShortcut {
     NIGHT_MODE,
     MIRROR_MODE,
     VERTICAL_FLIP,
+    SKIP_INTRO,
     ;
 
     companion object {
@@ -36,6 +37,7 @@ enum class PlayerShortcut {
             PLAYBACK_SPEED,
             LOOP,
             SHUFFLE,
+            SKIP_INTRO,
         )
     }
 }

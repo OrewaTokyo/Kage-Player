@@ -610,4 +610,11 @@
     <string name="about_terms_description">Read the terms of use</string>
     <string name="about_based_on">Based on Next Player</string>
     <string name="about_based_on_description">Open source under GPL-3.0</string>
+
+    <!-- Continue watching, skip intro -->
+    <string name="continue_watching">Continue watching</string>
+    <string name="up_next">Up next</string>
+    <string name="play_now">Play now</string>
+    <string name="skip_intro">Skip intro</string>
+    <string name="shortcut_skip_intro">Skip intro button</string>
 </resources>

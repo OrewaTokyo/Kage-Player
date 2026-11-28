@@ -30,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
@@ -279,7 +280,7 @@ private fun Video.isLocalUri(): Boolean {
 }
 
 @Composable
-private fun ThumbnailView(
+internal fun ThumbnailView(
     modifier: Modifier = Modifier,
     video: Video,
     preferences: ApplicationPreferences,
@@ -299,7 +300,7 @@ private fun ThumbnailView(
     }
     Box(
         modifier = modifier
-            .clip(MaterialTheme.shapes.small)
+            .clip(MaterialTheme.shapes.medium)
             .background(MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp))
             .aspectRatio(ratio = 16f / 10f),
     ) {
@@ -322,6 +323,16 @@ private fun ThumbnailView(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )
+            // Soft fade at the bottom so the duration and progress bar stay readable.
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.55f)),
+                        ),
+                    ),
+            )
         }
         if (preferences.showDurationField && video.duration > 0 &&
             video.formattedDuration.isNotBlank()
@@ -343,8 +354,8 @@ private fun ThumbnailView(
                 modifier = Modifier
                     .padding(5.dp)
                     .align(Alignment.TopStart),
-                backgroundColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
+                backgroundColor = MaterialTheme.colorScheme.tertiary,
+                contentColor = MaterialTheme.colorScheme.onTertiary,
                 shape = MaterialTheme.shapes.extraSmall,
             )
         }
@@ -359,14 +370,14 @@ private fun ThumbnailView(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.secondaryContainer),
+                        .background(Color.Black.copy(alpha = 0.4f)),
                 )
                 Box(
                     modifier = Modifier
                         .fillMaxWidth(fraction = video.playedPercentage!!)
                         .fillMaxHeight()
                         .clip(shape = CircleShape)
-                        .background(MaterialTheme.colorScheme.primary),
+                        .background(MaterialTheme.colorScheme.tertiary),
                 )
             }
         }

@@ -231,7 +231,7 @@ private fun createCaptionStyle(
             android.graphics.Color.BLACK.takeIf { configuration.showBackground }
                 ?: android.graphics.Color.TRANSPARENT,
             android.graphics.Color.TRANSPARENT,
-            CaptionStyleCompat.EDGE_TYPE_DROP_SHADOW,
+            CaptionStyleCompat.EDGE_TYPE_OUTLINE,
             android.graphics.Color.BLACK,
             Typeface.create(
                 configuration.font.toTypeface(),

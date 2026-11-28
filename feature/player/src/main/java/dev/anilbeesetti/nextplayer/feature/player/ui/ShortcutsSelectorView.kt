@@ -130,4 +130,5 @@ private fun PlayerShortcut.labelRes(): Int = when (this) {
     PlayerShortcut.NIGHT_MODE -> R.string.shortcut_night_mode
     PlayerShortcut.MIRROR_MODE -> R.string.shortcut_mirror_mode
     PlayerShortcut.VERTICAL_FLIP -> R.string.shortcut_vertical_flip
+    PlayerShortcut.SKIP_INTRO -> R.string.shortcut_skip_intro
 }
