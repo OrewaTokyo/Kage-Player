@@ -31,4 +31,3 @@ The build needs the repository secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYST
 
 ## License
 
-GNU General Public License v3.0, see `LICENSE`. Kage Player is based on the open-source [Next Player](https://github.com/anilbeesetti/NextPlayer) by Anil Beesetti.
