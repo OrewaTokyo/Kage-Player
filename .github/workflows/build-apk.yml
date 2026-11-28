@@ -87,27 +87,41 @@ jobs:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          VERSION_NAME: ${{ steps.ver.outputs.name }}
         run: |
-          IN=$(find . -path '*build/outputs/apk*' -name '*release*.apk' | head -1)
-          test -n "$IN" || { echo "No release APK found"; exit 1; }
-          echo "Built: $IN"
           BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
           echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
-          "$BT/zipalign" -p -f 4 "$IN" "$RUNNER_TEMP/aligned.apk"
-          OUT="KagePlayer-v${{ steps.ver.outputs.name }}.apk"
           ALIAS_ARG=""; [ -n "$ANDROID_KEY_ALIAS" ] && ALIAS_ARG="--ks-key-alias $ANDROID_KEY_ALIAS"
-          "$BT/apksigner" sign --ks "$RUNNER_TEMP/release.jks" --ks-pass env:ANDROID_KEYSTORE_PASSWORD $ALIAS_ARG --out "$OUT" "$RUNNER_TEMP/aligned.apk"
-          "$BT/apksigner" verify --print-certs "$OUT" | tee "$RUNNER_TEMP/certs.txt"
+          APKS=""
+          # Always the same two files, never "whichever was found first":
+          #   arm64-v8a  = small, for almost every phone
+          #   universal  = big, runs on any device
+          for ABI in arm64-v8a universal; do
+            IN=$(find . -path '*build/outputs/apk*' -name "*${ABI}*release*.apk" ! -name '*debug*' | head -1)
+            if [ -z "$IN" ]; then echo "::warning::No $ABI release APK was built"; continue; fi
+            echo "Built ($ABI): $IN ($(du -h "$IN" | cut -f1))"
+            OUT="KagePlayer-v${VERSION_NAME}-${ABI}.apk"
+            "$BT/zipalign" -p -f 4 "$IN" "$RUNNER_TEMP/aligned-$ABI.apk"
+            "$BT/apksigner" sign --ks "$RUNNER_TEMP/release.jks" --ks-pass env:ANDROID_KEYSTORE_PASSWORD $ALIAS_ARG --out "$OUT" "$RUNNER_TEMP/aligned-$ABI.apk"
+            "$BT/apksigner" verify --print-certs "$OUT" | tee "$RUNNER_TEMP/certs-$ABI.txt"
+            APKS="${APKS}${OUT}"$'\n'
+            KEY=$(grep 'SHA-256 digest' "$RUNNER_TEMP/certs-$ABI.txt" | head -1 | awk '{print $NF}')
+          done
           rm -f "$RUNNER_TEMP/release.jks"
-          echo "apk=$OUT" >> "$GITHUB_OUTPUT"
-          echo "key=$(grep 'SHA-256 digest' "$RUNNER_TEMP/certs.txt" | head -1 | awk '{print $NF}')" >> "$GITHUB_OUTPUT"
+          test -n "$APKS" || { echo "::error::No release APK found"; exit 1; }
+          {
+            echo "apks<<APKS_END"
+            printf '%s' "$APKS"
+            echo "APKS_END"
+            echo "key=$KEY"
+          } >> "$GITHUB_OUTPUT"
       - name: Publish a new release for this build
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.ver.outputs.name }}
           name: Kage Player v${{ steps.ver.outputs.name }}
           target_commitish: ${{ github.sha }}
-          body: "Installs over the previous version: same signing key (SHA-256 ${{ steps.sign.outputs.key }}), version code ${{ steps.ver.outputs.code }}."
+          body: "Most phones: download the arm64-v8a file (small). If it will not install, use the universal file (big, runs on any device). Both install over the previous version: same signing key (SHA-256 ${{ steps.sign.outputs.key }}), version code ${{ steps.ver.outputs.code }}."
           generate_release_notes: true
           make_latest: true
-          files: ${{ steps.sign.outputs.apk }}
+          files: ${{ steps.sign.outputs.apks }}

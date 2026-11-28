@@ -5,9 +5,9 @@ on:
   workflow_dispatch:
     inputs:
       source_url:
-        description: "Optional: a zip link to download instead of using site.zip (for the first start, use the default)"
+        description: "Optional: a zip link to download instead of using site.zip. Leave EMPTY normally. Never paste the original Next Player link: it would overwrite your whole project."
         required: false
-        default: "https://github.com/anilbeesetti/nextplayer/archive/refs/heads/main.zip"
+        default: ""
 permissions:
   contents: write
   actions: write
@@ -17,9 +17,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Get the zip
+        env:
+          SOURCE_URL: ${{ inputs.source_url }}
         run: |
-          if [ -n "${{ inputs.source_url }}" ]; then
-            curl -fL --retry 3 -o site.zip "${{ inputs.source_url }}"
+          case "$SOURCE_URL" in
+            *anilbeesetti/*)
+              echo "::error::That link is the original Next Player project. Unpacking it would overwrite Kage Player. Stopped."; exit 1 ;;
+          esac
+          if [ -n "$SOURCE_URL" ]; then
+            curl -fL --retry 3 -o site.zip "$SOURCE_URL"
           fi
           test -f site.zip || { echo "No site.zip in the repo and no source_url given"; exit 1; }
       - name: Unpack into folders
