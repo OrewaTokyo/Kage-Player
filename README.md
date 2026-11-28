@@ -13,7 +13,7 @@ A free, ad-free Android video player made for watching anime on your phone. Ever
 
 ## Build
 
-Builds run on GitHub Actions (`.github/workflows/build-apk.yml`). Each build checks that the XML and Kotlin code are valid, then publishes a signed APK under Releases. If a build fails, the run summary shows the exact error and the full Gradle log is attached as `gradle-log`.
+Builds run on GitHub Actions (`.github/workflows/build-apk.yml`). Each build checks that the XML and Kotlin code are valid, then publishes two signed APKs under Releases: `arm64-v8a` (small, for almost every phone) and `universal` (large, runs on any device). If a build fails, the run summary shows the exact error and the full Gradle log is attached as `gradle-log`.
 
 The build needs the repository secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD` and `ANDROID_KEY_ALIAS`.
 

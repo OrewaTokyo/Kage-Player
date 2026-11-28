@@ -18,6 +18,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,12 +32,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.session.MediaController
 import androidx.media3.ui.compose.state.rememberProgressStateWithTickInterval
 import dev.anilbeesetti.nextplayer.core.common.extensions.isTelevision
 import dev.anilbeesetti.nextplayer.core.model.PlayerShortcut
 import dev.anilbeesetti.nextplayer.core.ui.R
 import dev.anilbeesetti.nextplayer.core.ui.components.requestFocusUntilLanded
 import dev.anilbeesetti.nextplayer.core.ui.components.thenIf
+import dev.anilbeesetti.nextplayer.feature.player.service.setSleepTimer
 import dev.anilbeesetti.nextplayer.feature.player.state.ControlsVisibilityState
 import dev.anilbeesetti.nextplayer.feature.player.state.PlayerEffectsHandler
 import dev.anilbeesetti.nextplayer.feature.player.state.PlayerEffectsState
@@ -53,6 +56,7 @@ import dev.anilbeesetti.nextplayer.feature.player.ui.OverlayView
 import dev.anilbeesetti.nextplayer.feature.player.ui.PlayerGestureIndicators
 import dev.anilbeesetti.nextplayer.feature.player.ui.SkipIntroButton
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.launch
 
 /** Controls and overlays shared by live playback and the previewable content. */
 @OptIn(UnstableApi::class)
@@ -97,6 +101,7 @@ internal fun MediaPlayerControls(
 
     val context = LocalContext.current
     val isTv = remember { context.isTelevision }
+    val coroutineScope = rememberCoroutineScope()
     PlayerEffectsHandler(player = player, state = effects, mediaId = metadataState.mediaId)
 
     fun openAudioEffects() {
@@ -258,6 +263,9 @@ internal fun MediaPlayerControls(
                 sleepTimerMinutes = effects.sleepTimerMinutes,
                 onSleepTimerSelected = { minutes ->
                     if (minutes == null) effects.cancelSleepTimer() else effects.startSleepTimer(minutes)
+                    coroutineScope.launch {
+                        (player as? MediaController)?.setSleepTimer(minutes = minutes ?: 0)
+                    }
                 },
             )
         }

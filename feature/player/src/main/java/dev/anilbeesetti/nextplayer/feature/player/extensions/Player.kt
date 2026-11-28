@@ -94,10 +94,10 @@ fun Player.autoSelectSubtitleTrack() {
         .orEmpty()
         .lowercase()
 
-    val bestIndex = textGroups
+    val best = textGroups
         .withIndex()
         .filter { (_, group) -> group.isSupported && group.length > 0 }
-        .maxByOrNull { (_, group) ->
+        .map { (index, group) ->
             val format = group.getTrackFormat(0)
             val language = format.language.orEmpty().lowercase()
             val title = format.label.orEmpty().lowercase()
@@ -109,10 +109,14 @@ fun Player.autoSelectSubtitleTrack() {
             if (format.selectionFlags and C.SELECTION_FLAG_DEFAULT != 0) score += 2
             if (format.selectionFlags and C.SELECTION_FLAG_FORCED != 0) score -= 6
             if ("sign" in title || "song" in title) score -= 3
-            score
+            index to score
         }
-        ?.index
+        .maxByOrNull { it.second }
         ?: return
+
+    // Forced and "Signs & Songs" tracks only translate a few lines, so they are never turned on for you.
+    if (best.second < 0) return
+    val bestIndex = best.first
 
     switchTrack(C.TRACK_TYPE_TEXT, trackIndex = bestIndex)
 }

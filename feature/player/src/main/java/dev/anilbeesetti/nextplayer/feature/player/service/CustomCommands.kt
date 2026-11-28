@@ -30,6 +30,7 @@ enum class CustomCommands(val customAction: String) {
     SET_VIDEO_DECODER_MODE(customAction = "SET_VIDEO_DECODER_MODE"),
     SET_AUDIO_DECODER_MODE(customAction = "SET_AUDIO_DECODER_MODE"),
     TRY_DECODER_FALLBACK(customAction = "TRY_DECODER_FALLBACK"),
+    SET_SLEEP_TIMER(customAction = "SET_SLEEP_TIMER"),
     ;
 
     val sessionCommand = SessionCommand(
@@ -63,6 +64,7 @@ enum class CustomCommands(val customAction: String) {
         const val DECODER_RECOVERY_STATUS_KEY = "decoder_recovery_status"
         const val DECODER_RECOVERY_TRACK_TYPE_KEY = "decoder_recovery_track_type"
         const val UNSUPPORTED_DECODER_MODE_KEY = "unsupported_decoder_mode"
+        const val SLEEP_TIMER_MINUTES_KEY = "sleep_timer_minutes"
     }
 }
 
@@ -277,4 +279,15 @@ suspend fun MediaController.tryDecoderFallback(): Boolean {
 internal fun Bundle.decoderMode(key: String): DecoderMode? {
     val value = getString(key) ?: return null
     return DecoderMode.entries.find { it.name == value }
+}
+
+/** Pauses playback after [minutes]. Passing 0 cancels the timer. It keeps running if the player screen is closed. */
+suspend fun MediaController.setSleepTimer(minutes: Int): Boolean {
+    val args = Bundle().apply {
+        putInt(CustomCommands.SLEEP_TIMER_MINUTES_KEY, minutes)
+    }
+    return sendCustomCommand(
+        CustomCommands.SET_SLEEP_TIMER.sessionCommand,
+        args,
+    ).await().resultCode == SessionResult.RESULT_SUCCESS
 }

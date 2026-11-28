@@ -46,6 +46,7 @@ import dev.anilbeesetti.nextplayer.core.common.di.DiQualifiers
 import dev.anilbeesetti.nextplayer.core.common.extensions.getFilenameFromUri
 import dev.anilbeesetti.nextplayer.core.common.extensions.getLocalSubtitles
 import dev.anilbeesetti.nextplayer.core.common.extensions.getPath
+import dev.anilbeesetti.nextplayer.core.common.terms.TermsAcceptance
 import dev.anilbeesetti.nextplayer.core.data.repository.MediaRepository
 import dev.anilbeesetti.nextplayer.core.data.repository.PreferencesRepository
 import dev.anilbeesetti.nextplayer.core.media.network.NetworkUri
@@ -59,10 +60,10 @@ import dev.anilbeesetti.nextplayer.feature.player.R
 import dev.anilbeesetti.nextplayer.feature.player.extensions.addAdditionalSubtitleConfiguration
 import dev.anilbeesetti.nextplayer.feature.player.extensions.audioDecoderMode
 import dev.anilbeesetti.nextplayer.feature.player.extensions.audioTrackIndex
+import dev.anilbeesetti.nextplayer.feature.player.extensions.autoSelectSubtitleTrack
 import dev.anilbeesetti.nextplayer.feature.player.extensions.copy
 import dev.anilbeesetti.nextplayer.feature.player.extensions.externalAudio
 import dev.anilbeesetti.nextplayer.feature.player.extensions.externalAudioIndex
-import dev.anilbeesetti.nextplayer.feature.player.extensions.autoSelectSubtitleTrack
 import dev.anilbeesetti.nextplayer.feature.player.extensions.getManuallySelectedTrackIndex
 import dev.anilbeesetti.nextplayer.feature.player.extensions.positionMs
 import dev.anilbeesetti.nextplayer.feature.player.extensions.setExtras
@@ -94,6 +95,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.guava.future
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
@@ -110,6 +112,7 @@ class PlayerService : MediaSessionService() {
     )
     private val applicationScope: CoroutineScope by inject(named(DiQualifiers.APPLICATION_SCOPE))
     private var mediaSession: MediaSession? = null
+    private var sleepTimerJob: Job? = null
     private var artworkLoadJob: Job? = null
 
     private val preferencesRepository: PreferencesRepository by inject()
@@ -672,6 +675,20 @@ class PlayerService : MediaSessionService() {
                     return@future SessionResult(SessionResult.RESULT_SUCCESS)
                 }
 
+                CustomCommands.SET_SLEEP_TIMER -> {
+                    val minutes = args.getInt(CustomCommands.SLEEP_TIMER_MINUTES_KEY)
+                    sleepTimerJob?.cancel()
+                    sleepTimerJob = if (minutes > 0) {
+                        serviceScope.launch {
+                            delay(minutes * 60_000L)
+                            mediaSession?.player?.pause()
+                        }
+                    } else {
+                        null
+                    }
+                    return@future SessionResult(SessionResult.RESULT_SUCCESS)
+                }
+
                 CustomCommands.GET_SKIP_SILENCE_ENABLED -> {
                     val enabled = mediaSession?.player?.playerSpecificSkipSilenceEnabled ?: false
                     return@future SessionResult(
@@ -909,8 +926,9 @@ class PlayerService : MediaSessionService() {
         }
     }
 
+    // Nothing may control playback (media buttons, other apps) before the Terms & Conditions are accepted.
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? =
-        mediaSession
+        if (TermsAcceptance.isAccepted(context = this)) mediaSession else null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_RETAIN_PLAYBACK_GRANTS) {
@@ -938,8 +956,7 @@ class PlayerService : MediaSessionService() {
                 buildUponParameters()
                     .setTunnelingEnabled(playerPreferences.enableTunneledPlayback)
                     .setPreferredAudioLanguage(playerPreferences.preferredAudioLanguage)
-                    .setPreferredTextLanguage(playerPreferences.preferredSubtitleLanguage)
-                    .setSelectUndeterminedTextLanguage(true),
+                    .setPreferredTextLanguage(playerPreferences.preferredSubtitleLanguage),
             )
         }
 

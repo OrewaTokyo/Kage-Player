@@ -77,7 +77,10 @@ fun MediaView(
     val continueTarget: Pair<Video, Boolean>? = remember(recentlyPlayedVideo, mediaHolder.videos) {
         recentlyPlayedVideo?.let { last ->
             if ((last.playedPercentage ?: 0f) < FINISHED_FRACTION) {
-                last to false
+                // Show it on screens that list folders, or in the folder that holds the episode.
+                val isRelevantHere = mediaHolder.folders.isNotEmpty() ||
+                    mediaHolder.videos.any { it.path == last.path }
+                if (isRelevantHere) last to false else null
             } else {
                 val index = mediaHolder.videos.indexOfFirst { it.path == last.path }
                 if (index < 0) null else mediaHolder.videos.getOrNull(index + 1)?.let { it to true }

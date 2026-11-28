@@ -61,10 +61,14 @@ android {
 
     signingConfigs {
         getByName("debug") {
-            storeFile = file("${project.rootDir}/app/debug.keystore")
-            storePassword = "android"
-            keyAlias = "androiddebugkey"
-            keyPassword = "android"
+            // Without this file Android Studio's default debug keystore is used, so debug builds still work.
+            val projectDebugKeystore = file("${project.rootDir}/app/debug.keystore")
+            if (projectDebugKeystore.exists()) {
+                storeFile = projectDebugKeystore
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
         }
     }
 

@@ -92,7 +92,7 @@ fun PlayerEffectsHandler(player: Player, state: PlayerEffectsState, mediaId: Str
         val endsAt = state.sleepTimerEndsAtMs ?: return@LaunchedEffect
         val remaining = endsAt - SystemClock.elapsedRealtime()
         if (remaining > 0) delay(remaining)
-        player.pause()
+        // The player itself is paused by the service, so it also works after this screen is closed.
         state.cancelSleepTimer()
     }
 
